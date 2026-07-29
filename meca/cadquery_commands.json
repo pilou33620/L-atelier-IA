@@ -1,0 +1,175 @@
+{
+    "cadquery_api": {
+        "description": "Un aide-mémoire complet des commandes principales de la bibliothèque Python CadQuery pour la modélisation 3D paramétrique.",
+        "categories": {
+            "initialisation": [
+                {
+                    "commande": "cq.Workplane(planeName)",
+                    "description": "Crée un nouveau plan de travail de base. Les plans courants sont 'XY', 'XZ', 'YZ'.",
+                    "exemple": "plan = cq.Workplane('XY')"
+                }
+            ],
+            "operations_2d_esquisse": [
+                {
+                    "commande": "rect(xLen, yLen)",
+                    "description": "Dessine un rectangle centré sur le point actuel.",
+                    "exemple": ".rect(10, 10)"
+                },
+                {
+                    "commande": "circle(radius)",
+                    "description": "Dessine un cercle.",
+                    "exemple": ".circle(5)"
+                },
+                {
+                    "commande": "polygon(n_sides, diameter)",
+                    "description": "Dessine un polygone régulier inscrit dans le diamètre spécifié.",
+                    "exemple": ".polygon(6, 10)"
+                },
+                {
+                    "commande": "polyline(listOfXYTuple)",
+                    "description": "Dessine une ligne brisée à partir d'une liste de points (x, y).",
+                    "exemple": ".polyline([(0,0), (10,0), (10,5)])"
+                },
+                {
+                    "commande": "spline(listOfXYTuple)",
+                    "description": "Dessine une courbe spline douce passant par la liste des points donnés.",
+                    "exemple": ".spline([(0,0), (5,5), (10,0)])"
+                },
+                {
+                    "commande": "lineTo(x, y)",
+                    "description": "Trace une ligne du point actuel jusqu'au point absolu (x, y).",
+                    "exemple": ".lineTo(10, 5)"
+                },
+                {
+                    "commande": "close()",
+                    "description": "Ferme l'esquisse en cours (relie le dernier point au premier).",
+                    "exemple": ".close()"
+                }
+            ],
+            "primitives_3d": [
+                {
+                    "commande": "box(length, width, height, centered=(True, True, True))",
+                    "description": "Crée un parallélépipède. ATTENTION: Par défaut, le centre de l'objet est à (0,0,0). Utilisez centered=(True, True, False) pour que la base commence à Z=0.",
+                    "exemple": ".box(10, 10, 10, centered=(True, True, False))"
+                },
+                {
+                    "commande": "cylinder(height, radius, centered=(True, True, True))",
+                    "description": "Crée un cylindre. ATTENTION: Par défaut, le centre du cylindre est sur (0,0,0) et il s'étend de -height/2 à +height/2. Utilisez centered=(True, True, False) pour que sa base soit à Z=0 et son sommet à Z=height.",
+                    "exemple": ".cylinder(10, 5, centered=(True, True, False))"
+                },
+                {
+                    "commande": "sphere(radius)",
+                    "description": "Crée une sphère centrée par défaut.",
+                    "exemple": ".sphere(5)"
+                }
+            ],
+            "operations_3d_generation": [
+                {
+                    "commande": "extrude(distance)",
+                    "description": "Extrude l'esquisse 2D courante sur une distance donnée pour créer un solide 3D.",
+                    "exemple": ".extrude(10)"
+                },
+                {
+                    "commande": "revolve(angle, axisStart, axisEnd)",
+                    "description": "Effectue une révolution de l'esquisse autour de l'axe spécifié.",
+                    "exemple": ".revolve(360, (-10, -10), (-10, 10))"
+                },
+                {
+                    "commande": "sweep(path)",
+                    "description": "Balaie l'esquisse le long d'un chemin filaire (wire) donné.",
+                    "exemple": ".sweep(chemin_courbe)"
+                },
+                {
+                    "commande": "loft(combine=True)",
+                    "description": "Crée un lissage (loft) entre plusieurs profils empilés.",
+                    "exemple": ".loft()"
+                }
+            ],
+            "modifications_solides": [
+                {
+                    "commande": "fillet(radius)",
+                    "description": "Ajoute un congé (arrondi) sur les arêtes sélectionnées.",
+                    "exemple": ".edges('|Z').fillet(2)"
+                },
+                {
+                    "commande": "chamfer(length)",
+                    "description": "Ajoute un chanfrein plat sur les arêtes sélectionnées.",
+                    "exemple": ".edges().chamfer(1)"
+                },
+                {
+                    "commande": "shell(thickness)",
+                    "description": "Évide le solide pour créer une coque. Une épaisseur négative évide vers l'intérieur.",
+                    "exemple": ".faces('<Z').shell(-1)"
+                },
+                {
+                    "commande": "hole(diameter, depth)",
+                    "description": "Crée un perçage (trou cylindrique) dans le solide.",
+                    "exemple": ".faces('>Z').workplane().hole(3)"
+                }
+            ],
+            "selections_et_navigation": [
+                {
+                    "commande": "faces(selector)",
+                    "description": "Sélectionne des faces en utilisant une chaîne de caractères (ex: '>Z' pour face sup, '<X' pour face gauche).",
+                    "exemple": ".faces('>Z')"
+                },
+                {
+                    "commande": "edges(selector)",
+                    "description": "Sélectionne des arêtes (ex: '|Z' pour les arêtes parallèles à Z, '%Line' pour les lignes droites).",
+                    "exemple": ".edges('|Z')"
+                },
+                {
+                    "commande": "vertices(selector)",
+                    "description": "Sélectionne des points/sommets spécifiques du solide.",
+                    "exemple": ".vertices('<X')"
+                },
+                {
+                    "commande": "workplane(offset)",
+                    "description": "Crée un nouveau plan de travail à partir de la face ou du plan actuellement sélectionné.",
+                    "exemple": ".faces('>Z').workplane(offset=2)"
+                }
+            ],
+            "operations_booleennes": [
+                {
+                    "commande": "union(toUnion)",
+                    "description": "Fusionne le plan de travail actuel avec l'objet fourni.",
+                    "exemple": ".union(autre_objet)"
+                },
+                {
+                    "commande": "cut(toCut)",
+                    "description": "Soustrait l'objet fourni de l'objet actuel.",
+                    "exemple": ".cut(outil_de_coupe)"
+                },
+                {
+                    "commande": "intersect(toIntersect)",
+                    "description": "Conserve uniquement l'intersection entre l'objet actuel et l'objet fourni.",
+                    "exemple": ".intersect(autre_objet)"
+                }
+            ],
+            "transformations_spatiales": [
+                {
+                    "commande": "translate(vec)",
+                    "description": "Déplace l'objet selon un vecteur de déplacement (x, y, z).",
+                    "exemple": ".translate((10, 0, 5))"
+                },
+                {
+                    "commande": "rotate(axisStartPt, axisEndPt, angleDegrees)",
+                    "description": "Fait pivoter l'objet d'un angle donné autour d'un axe.",
+                    "exemple": ".rotate((0,0,0), (0,0,1), 45)"
+                },
+                {
+                    "commande": "mirror(mirrorPlane)",
+                    "description": "Crée une symétrie (miroir) de l'objet par rapport à un plan ('XY', 'XZ', 'YZ').",
+                    "exemple": ".mirror('XY')"
+                }
+            ],
+            "exportation": [
+                {
+                    "commande": "exporters.export(shape, filename)",
+                    "description": "Exporte la forme géométrique vers un fichier (formats supportés: STEP, STL, SVG, AMF, etc.).",
+                    "exemple": "cq.exporters.export(resultat, 'modele.step')"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,12 @@
+PyQt6
+google-genai
+graphifyy
+openai
+anthropic
+PyMuPDF
+skidl
+requests
+beautifulsoup4
+cadquery
+CQ-Editor
+docker

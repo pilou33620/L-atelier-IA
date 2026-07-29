@@ -1,0 +1,9 @@
+{
+  "assistant_general": {
+    "name": "Assistant Général",
+    "role": "worker",
+    "default_active": true,
+    "system_prompt": "Tu es un assistant général IA. Tu réponds aux questions de l'utilisateur de manière concise et utile.",
+    "read_only": false
+  }
+}

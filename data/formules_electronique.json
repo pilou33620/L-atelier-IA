@@ -1,0 +1,1066 @@
+[
+  {
+    "id": 1,
+    "categorie": "Lois Fondamentales",
+    "nom": "Loi d'Ohm",
+    "formule": "V = R * I",
+    "description": "Tension (V) en fonction de la résistance (R) et du courant (I)."
+  },
+  {
+    "id": 2,
+    "categorie": "Lois Fondamentales",
+    "nom": "Puissance Électrique (via V et I)",
+    "formule": "P = V * I",
+    "description": "Puissance électrique (P) calculée avec la tension et le courant."
+  },
+  {
+    "id": 3,
+    "categorie": "Lois Fondamentales",
+    "nom": "Puissance Électrique (via R et I)",
+    "formule": "P = R * I^2",
+    "description": "Puissance dissipée par effet Joule via le courant."
+  },
+  {
+    "id": 4,
+    "categorie": "Lois Fondamentales",
+    "nom": "Puissance Électrique (via V et R)",
+    "formule": "P = V^2 / R",
+    "description": "Puissance dissipée par effet Joule via la tension."
+  },
+  {
+    "id": 5,
+    "categorie": "Lois Fondamentales",
+    "nom": "Résistances en Série",
+    "formule": "Req = R1 + R2 + ... + Rn",
+    "description": "Résistance équivalente de plusieurs résistances en série."
+  },
+  {
+    "id": 6,
+    "categorie": "Lois Fondamentales",
+    "nom": "Résistances en Parallèle",
+    "formule": "Req = 1 / (1/R1 + 1/R2 + ... + 1/Rn)",
+    "description": "Résistance équivalente de plusieurs résistances en parallèle."
+  },
+  {
+    "id": 7,
+    "categorie": "Lois Fondamentales",
+    "nom": "Pont Diviseur de Tension",
+    "formule": "V_out = V_in * (R2 / (R1 + R2))",
+    "description": "Tension aux bornes de R2 dans un circuit série R1-R2."
+  },
+  {
+    "id": 8,
+    "categorie": "Lois Fondamentales",
+    "nom": "Pont Diviseur de Courant",
+    "formule": "I_out = I_in * (R1 / (R1 + R2))",
+    "description": "Courant traversant R2 dans un circuit parallèle R1-R2."
+  },
+  {
+    "id": 9,
+    "categorie": "Lois Fondamentales",
+    "nom": "Conductance",
+    "formule": "G = 1 / R",
+    "description": "Capacité d'un composant à laisser passer le courant (en Siemens)."
+  },
+  {
+    "id": 10,
+    "categorie": "Lois Fondamentales",
+    "nom": "Résistivité d'un Conducteur",
+    "formule": "R = rho * (L / A)",
+    "description": "Résistance basée sur la résistivité (rho), la longueur (L) et la section (A)."
+  },
+  {
+    "id": 11,
+    "categorie": "Condensateurs",
+    "nom": "Charge d'un Condensateur",
+    "formule": "Q = C * V",
+    "description": "Charge stockée (Q) en fonction de la capacité (C) et de la tension (V)."
+  },
+  {
+    "id": 12,
+    "categorie": "Condensateurs",
+    "nom": "Courant d'un Condensateur",
+    "formule": "I = C * (dV / dt)",
+    "description": "Courant défini par la variation de tension dans le temps."
+  },
+  {
+    "id": 13,
+    "categorie": "Condensateurs",
+    "nom": "Énergie Stockée",
+    "formule": "E = 0.5 * C * V^2",
+    "description": "Énergie en Joules stockée dans le champ électrique du condensateur."
+  },
+  {
+    "id": 14,
+    "categorie": "Condensateurs",
+    "nom": "Condensateurs en Parallèle",
+    "formule": "Ceq = C1 + C2 + ... + Cn",
+    "description": "Capacité équivalente de condensateurs en parallèle."
+  },
+  {
+    "id": 15,
+    "categorie": "Condensateurs",
+    "nom": "Condensateurs en Série",
+    "formule": "Ceq = 1 / (1/C1 + 1/C2 + ... + 1/Cn)",
+    "description": "Capacité équivalente de condensateurs en série."
+  },
+  {
+    "id": 16,
+    "categorie": "Condensateurs",
+    "nom": "Constante de Temps RC",
+    "formule": "tau = R * C",
+    "description": "Temps nécessaire pour atteindre ~63.2% de la charge ou décharge."
+  },
+  {
+    "id": 17,
+    "categorie": "Condensateurs",
+    "nom": "Tension de Charge RC",
+    "formule": "V(t) = V0 * (1 - e^(-t/tau))",
+    "description": "Évolution temporelle de la tension lors de la charge."
+  },
+  {
+    "id": 18,
+    "categorie": "Condensateurs",
+    "nom": "Tension de Décharge RC",
+    "formule": "V(t) = V0 * e^(-t/tau)",
+    "description": "Évolution temporelle de la tension lors de la décharge."
+  },
+  {
+    "id": 19,
+    "categorie": "Condensateurs",
+    "nom": "Impédance Capacitive",
+    "formule": "Z_C = 1 / (j * omega * C)",
+    "description": "Impédance complexe d'un condensateur (omega = 2*pi*f)."
+  },
+  {
+    "id": 20,
+    "categorie": "Condensateurs",
+    "nom": "Réactance Capacitive",
+    "formule": "X_C = 1 / (2 * pi * f * C)",
+    "description": "Opposition au courant alternatif par un condensateur."
+  },
+  {
+    "id": 21,
+    "categorie": "Inductances",
+    "nom": "Tension d'une Inductance",
+    "formule": "V = L * (dI / dt)",
+    "description": "Tension générée par la variation de courant."
+  },
+  {
+    "id": 22,
+    "categorie": "Inductances",
+    "nom": "Énergie Stockée",
+    "formule": "E = 0.5 * L * I^2",
+    "description": "Énergie en Joules stockée dans le champ magnétique."
+  },
+  {
+    "id": 23,
+    "categorie": "Inductances",
+    "nom": "Inductances en Série",
+    "formule": "Leq = L1 + L2 + ... + Ln",
+    "description": "Inductance équivalente (sans couplage mutuel)."
+  },
+  {
+    "id": 24,
+    "categorie": "Inductances",
+    "nom": "Inductances en Parallèle",
+    "formule": "Leq = 1 / (1/L1 + 1/L2 + ... + 1/Ln)",
+    "description": "Inductance équivalente de bobines en parallèle."
+  },
+  {
+    "id": 25,
+    "categorie": "Inductances",
+    "nom": "Constante de Temps RL",
+    "formule": "tau = L / R",
+    "description": "Constante de temps pour l'établissement du courant dans un circuit RL."
+  },
+  {
+    "id": 26,
+    "categorie": "Inductances",
+    "nom": "Courant de Charge RL",
+    "formule": "I(t) = (V/R) * (1 - e^(-t/tau))",
+    "description": "Évolution temporelle du courant à l'allumage."
+  },
+  {
+    "id": 27,
+    "categorie": "Inductances",
+    "nom": "Courant de Décharge RL",
+    "formule": "I(t) = I0 * e^(-t/tau)",
+    "description": "Évolution temporelle du courant à l'extinction."
+  },
+  {
+    "id": 28,
+    "categorie": "Inductances",
+    "nom": "Impédance Inductive",
+    "formule": "Z_L = j * omega * L",
+    "description": "Impédance complexe d'une bobine."
+  },
+  {
+    "id": 29,
+    "categorie": "Inductances",
+    "nom": "Réactance Inductive",
+    "formule": "X_L = 2 * pi * f * L",
+    "description": "Opposition au courant alternatif par une bobine."
+  },
+  {
+    "id": 30,
+    "categorie": "Inductances",
+    "nom": "Inductance Mutuelle",
+    "formule": "M = k * sqrt(L1 * L2)",
+    "description": "Couplage magnétique entre deux bobines (k = coefficient de couplage)."
+  },
+  {
+    "id": 31,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Tension Efficace (RMS)",
+    "formule": "V_rms = V_peak / sqrt(2)",
+    "description": "Tension continue équivalente pour une onde sinusoïdale."
+  },
+  {
+    "id": 32,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Courant Efficace (RMS)",
+    "formule": "I_rms = I_peak / sqrt(2)",
+    "description": "Courant continu équivalent pour une onde sinusoïdale."
+  },
+  {
+    "id": 33,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Impédance Totale (RLC Série)",
+    "formule": "Z = sqrt(R^2 + (X_L - X_C)^2)",
+    "description": "Module de l'impédance dans un circuit RLC série."
+  },
+  {
+    "id": 34,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Déphasage (RLC)",
+    "formule": "phi = arctan((X_L - X_C) / R)",
+    "description": "Angle de déphasage entre la tension et le courant."
+  },
+  {
+    "id": 35,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Puissance Apparente",
+    "formule": "S = V_rms * I_rms",
+    "description": "Puissance totale complexe en Volt-Ampères (VA)."
+  },
+  {
+    "id": 36,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Puissance Active",
+    "formule": "P = S * cos(phi)",
+    "description": "Puissance réellement consommée en Watts (W)."
+  },
+  {
+    "id": 37,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Puissance Réactive",
+    "formule": "Q = S * sin(phi)",
+    "description": "Puissance fluctuante non dissipée en Volt-Ampères Réactifs (VAR)."
+  },
+  {
+    "id": 38,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Triangle des Puissances",
+    "formule": "S = sqrt(P^2 + Q^2)",
+    "description": "Relation fondamentale entre les trois types de puissances."
+  },
+  {
+    "id": 39,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Facteur de Puissance",
+    "formule": "FP = cos(phi) = P / S",
+    "description": "Efficacité du transfert de puissance (compris entre 0 et 1)."
+  },
+  {
+    "id": 40,
+    "categorie": "Courant Alternatif (AC) & RLC",
+    "nom": "Pulsation Angulaire",
+    "formule": "omega = 2 * pi * f",
+    "description": "Vitesse angulaire du signal alternatif."
+  },
+  {
+    "id": 41,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Fréquence de Coupure (Filtre RC)",
+    "formule": "f_c = 1 / (2 * pi * R * C)",
+    "description": "Fréquence à laquelle le signal est atténué de -3dB."
+  },
+  {
+    "id": 42,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Fréquence de Coupure (Filtre RL)",
+    "formule": "f_c = R / (2 * pi * L)",
+    "description": "Fréquence de coupure d'un filtre utilisant résistance et inductance."
+  },
+  {
+    "id": 43,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Fréquence de Résonance (RLC)",
+    "formule": "f_0 = 1 / (2 * pi * sqrt(L * C))",
+    "description": "Fréquence où X_L annule X_C (impédance purement résistive)."
+  },
+  {
+    "id": 44,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Facteur de Qualité (RLC Série)",
+    "formule": "Q = (1 / R) * sqrt(L / C)",
+    "description": "Sélectivité du circuit de résonance."
+  },
+  {
+    "id": 45,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Bande Passante (BP)",
+    "formule": "BP = f_haut - f_bas",
+    "description": "Plage de fréquences où l'atténuation est inférieure à 3dB."
+  },
+  {
+    "id": 46,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Relation Facteur Q et BP",
+    "formule": "Q = f_0 / BP",
+    "description": "Le facteur de qualité déduit de la largeur de bande."
+  },
+  {
+    "id": 47,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Gain en Tension Linéaire",
+    "formule": "A_v = V_out / V_in",
+    "description": "Rapport d'amplification d'un signal."
+  },
+  {
+    "id": 48,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Gain en Tension (Décibels)",
+    "formule": "A_v(dB) = 20 * log10(V_out / V_in)",
+    "description": "Amplification exprimée en échelle logarithmique."
+  },
+  {
+    "id": 49,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Gain en Puissance Linéaire",
+    "formule": "A_p = P_out / P_in",
+    "description": "Rapport d'amplification de puissance."
+  },
+  {
+    "id": 50,
+    "categorie": "Filtres et Fréquence",
+    "nom": "Gain en Puissance (Décibels)",
+    "formule": "A_p(dB) = 10 * log10(P_out / P_in)",
+    "description": "Amplification de puissance en dB."
+  },
+  {
+    "id": 51,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Équation de la Diode (Shockley)",
+    "formule": "I_d = I_s * (e^(V_d / (n * V_t)) - 1)",
+    "description": "Courant traversant une diode selon la tension appliquée."
+  },
+  {
+    "id": 52,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Tension Thermique",
+    "formule": "V_t = (k_B * T) / q",
+    "description": "Tension caractéristique (~26mV à température ambiante)."
+  },
+  {
+    "id": 53,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Courant Collecteur BJT",
+    "formule": "I_c = beta * I_b",
+    "description": "Gain en courant continu d'un transistor bipolaire."
+  },
+  {
+    "id": 54,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Courant Émetteur BJT",
+    "formule": "I_e = I_c + I_b",
+    "description": "Loi des nœuds pour un transistor NPN/PNP."
+  },
+  {
+    "id": 55,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Relation Alpha-Beta BJT",
+    "formule": "alpha = beta / (beta + 1)",
+    "description": "Rapport I_c / I_e."
+  },
+  {
+    "id": 56,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Transconductance BJT",
+    "formule": "g_m = I_c / V_t",
+    "description": "Rapport entre la variation du courant de sortie et la tension d'entrée."
+  },
+  {
+    "id": 57,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Résistance d'Entrée Base BJT",
+    "formule": "r_pi = beta / g_m",
+    "description": "Modèle petit signal pour l'entrée du BJT."
+  },
+  {
+    "id": 58,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Courant MOSFET (Régime Ohmique)",
+    "formule": "I_d = k_n * ((V_gs - V_th)*V_ds - (V_ds^2) / 2)",
+    "description": "Courant de drain lorsque V_ds < V_gs - V_th."
+  },
+  {
+    "id": 59,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Courant MOSFET (Régime Saturé)",
+    "formule": "I_d = 0.5 * k_n * (V_gs - V_th)^2",
+    "description": "Courant de drain indépendant de V_ds."
+  },
+  {
+    "id": 60,
+    "categorie": "Semi-Conducteurs",
+    "nom": "Transconductance MOSFET",
+    "formule": "g_m = k_n * (V_gs - V_th)",
+    "description": "Gain en tension interne du MOSFET."
+  },
+  {
+    "id": 61,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Montage Inverseur",
+    "formule": "V_out = - (R_f / R_in) * V_in",
+    "description": "Gain déterminé par le ratio des résistances avec inversion de phase."
+  },
+  {
+    "id": 62,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Montage Non-Inverseur",
+    "formule": "V_out = (1 + R_f / R_in) * V_in",
+    "description": "Gain positif sans inversion de phase."
+  },
+  {
+    "id": 63,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Montage Suiveur (Buffer)",
+    "formule": "V_out = V_in",
+    "description": "Adaptateur d'impédance avec un gain de 1."
+  },
+  {
+    "id": 64,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Montage Soustracteur / Différentiel",
+    "formule": "V_out = (R_f / R_in) * (V_2 - V_1)",
+    "description": "Amplifie la différence de tension (si les ratios sont égaux)."
+  },
+  {
+    "id": 65,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Montage Intégrateur",
+    "formule": "V_out = - (1 / (R * C)) * intégral(V_in dt)",
+    "description": "La sortie est l'intégrale de l'entrée dans le temps."
+  },
+  {
+    "id": 66,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Montage Dérivateur",
+    "formule": "V_out = - R * C * (dV_in / dt)",
+    "description": "La sortie est proportionnelle à la dérivée de l'entrée."
+  },
+  {
+    "id": 67,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Montage Sommateur Inverseur",
+    "formule": "V_out = - R_f * (V_1/R_1 + V_2/R_2 + ...)",
+    "description": "Additionne plusieurs tensions pondérées."
+  },
+  {
+    "id": 68,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Taux de Réjection du Mode Commun (CMRR)",
+    "formule": "CMRR(dB) = 20 * log10(A_d / A_cm)",
+    "description": "Capacité à ignorer les signaux communs aux deux entrées."
+  },
+  {
+    "id": 69,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Vitesse de Balayage (Slew Rate)",
+    "formule": "SR = max(dV_out / dt)",
+    "description": "Vitesse maximale à laquelle la tension de sortie peut changer."
+  },
+  {
+    "id": 70,
+    "categorie": "Amplificateurs Opérationnels (AOP)",
+    "nom": "Produit Gain-Bande (GBP)",
+    "formule": "GBP = A_v * f_c",
+    "description": "Le produit du gain par la bande passante est constant."
+  },
+  {
+    "id": 71,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Tension Moyenne (Redressement Double Alternance)",
+    "formule": "V_dc = (2 * V_peak) / pi",
+    "description": "Tension de sortie moyenne après un pont de diodes."
+  },
+  {
+    "id": 72,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Tension Moyenne (Redressement Simple Alternance)",
+    "formule": "V_dc = V_peak / pi",
+    "description": "Tension de sortie moyenne avec une seule diode."
+  },
+  {
+    "id": 73,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Tension d'Ondulation (Ripple)",
+    "formule": "V_ripple = I_load / (2 * f * C)",
+    "description": "Variation résiduelle de la tension filtrée par un condensateur."
+  },
+  {
+    "id": 74,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Rapport Cyclique (Duty Cycle)",
+    "formule": "D = t_on / T_sw",
+    "description": "Proportion de temps où le commutateur est fermé en découpage."
+  },
+  {
+    "id": 75,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Tension de Sortie Hacheur Série (Buck)",
+    "formule": "V_out = D * V_in",
+    "description": "Abaisseur de tension continu."
+  },
+  {
+    "id": 76,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Tension de Sortie Hacheur Parallèle (Boost)",
+    "formule": "V_out = V_in / (1 - D)",
+    "description": "Élévateur de tension continu."
+  },
+  {
+    "id": 77,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Tension de Sortie Hacheur Inverseur (Buck-Boost)",
+    "formule": "V_out = - V_in * (D / (1 - D))",
+    "description": "Convertisseur continu capable de monter ou descendre la tension."
+  },
+  {
+    "id": 78,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Rapport de Transformation (Tension)",
+    "formule": "V_s / V_p = N_s / N_p",
+    "description": "Rapport entre spires et tensions du transformateur."
+  },
+  {
+    "id": 79,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Rapport de Transformation (Courant)",
+    "formule": "I_p / I_s = N_s / N_p",
+    "description": "Rapport inverse pour les courants du transformateur."
+  },
+  {
+    "id": 80,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Rendement Énergétique",
+    "formule": "eta = (P_out / P_in) * 100",
+    "description": "Pourcentage de puissance utile par rapport à l'entrée."
+  },
+  {
+    "id": 81,
+    "categorie": "PCB et Lignes de Transmission",
+    "nom": "Résistance d'une Piste Cuivre",
+    "formule": "R_trace = rho * L / (W * t)",
+    "description": "Fonction de la résistivité, de la largeur (W), l'épaisseur (t) et la longueur (L)."
+  },
+  {
+    "id": 82,
+    "categorie": "PCB et Lignes de Transmission",
+    "nom": "Impédance Caractéristique (Sans perte)",
+    "formule": "Z_0 = sqrt(L / C)",
+    "description": "Impédance intrinsèque d'une ligne de transmission unitaire."
+  },
+  {
+    "id": 83,
+    "categorie": "PCB et Lignes de Transmission",
+    "nom": "Délai de Propagation",
+    "formule": "t_pd = sqrt(L * C)",
+    "description": "Temps mis par un signal pour parcourir la ligne (par unité de longueur)."
+  },
+  {
+    "id": 84,
+    "categorie": "PCB et Lignes de Transmission",
+    "nom": "Épaisseur de Peau (Skin Depth)",
+    "formule": "delta = sqrt(rho / (pi * f * mu))",
+    "description": "Profondeur de pénétration du courant haute fréquence."
+  },
+  {
+    "id": 85,
+    "categorie": "Signaux et Bruit",
+    "nom": "Bruit Thermique (Johnson-Nyquist)",
+    "formule": "V_th = sqrt(4 * k_B * T * R * BW)",
+    "description": "Tension de bruit RMS générée par l'agitation thermique."
+  },
+  {
+    "id": 86,
+    "categorie": "Signaux et Bruit",
+    "nom": "Bruit de Grenaille (Shot Noise)",
+    "formule": "I_sh = sqrt(2 * q * I_dc * BW)",
+    "description": "Courant de bruit dû à la quantification de la charge électrique."
+  },
+  {
+    "id": 87,
+    "categorie": "Signaux et Bruit",
+    "nom": "Rapport Signal sur Bruit (SNR)",
+    "formule": "SNR(dB) = 10 * log10(P_signal / P_noise)",
+    "description": "Mesure de la qualité du signal par rapport au bruit de fond."
+  },
+  {
+    "id": 88,
+    "categorie": "Signaux et Bruit",
+    "nom": "Facteur de Bruit (Noise Figure)",
+    "formule": "NF = 10 * log10(SNR_in / SNR_out)",
+    "description": "Dégradation du SNR causée par un composant."
+  },
+  {
+    "id": 89,
+    "categorie": "Signaux et Bruit",
+    "nom": "Puissance en dBm",
+    "formule": "P(dBm) = 10 * log10(P / 1mW)",
+    "description": "Puissance absolue référencée à 1 milliwatt."
+  },
+  {
+    "id": 90,
+    "categorie": "Signaux et Bruit",
+    "nom": "Tension en dBV",
+    "formule": "V(dBV) = 20 * log10(V_rms / 1V)",
+    "description": "Tension absolue référencée à 1 Volt."
+  },
+  {
+    "id": 91,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Longueur d'Onde Guidée",
+    "formule": "lambda = c / (f * sqrt(epsilon_r))",
+    "description": "Longueur d'onde d'un signal se propageant dans un diélectrique."
+  },
+  {
+    "id": 92,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Coefficient de Réflexion",
+    "formule": "Gamma = (Z_L - Z_0) / (Z_L + Z_0)",
+    "description": "Ratio de l'onde réfléchie sur l'onde incidente en cas de désadaptation."
+  },
+  {
+    "id": 93,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Taux d'Onde Stationnaire (TOS / VSWR)",
+    "formule": "VSWR = (1 + |Gamma|) / (1 - |Gamma|)",
+    "description": "Indicateur de la désadaptation d'impédance de la ligne."
+  },
+  {
+    "id": 94,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Perte de Retour (Return Loss)",
+    "formule": "RL(dB) = -20 * log10(|Gamma|)",
+    "description": "Énergie perdue à cause de la réflexion, en dB."
+  },
+  {
+    "id": 95,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Capacité du Canal (Shannon-Hartley)",
+    "formule": "C = BW * log2(1 + SNR)",
+    "description": "Débit binaire maximal théorique d'un canal bruité."
+  },
+  {
+    "id": 96,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Temps de Montée / Bande Passante",
+    "formule": "t_r = 0.35 / BW",
+    "description": "Relation empirique entre le temps de montée d'un front et la bande passante requise."
+  },
+  {
+    "id": 97,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Équation des Télécommunications (Friis)",
+    "formule": "P_r = P_t * G_t * G_r * (lambda / (4 * pi * d))^2",
+    "description": "Puissance reçue en champ libre en fonction de la distance (d)."
+  },
+  {
+    "id": 98,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "PIRE (EIRP)",
+    "formule": "EIRP = P_t * G_t",
+    "description": "Puissance isotrope rayonnée équivalente de l'antenne d'émission."
+  },
+  {
+    "id": 99,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Décalage Doppler",
+    "formule": "f_d = (v / c) * f_c * cos(theta)",
+    "description": "Variation de fréquence due au déplacement de la source/récepteur."
+  },
+  {
+    "id": 100,
+    "categorie": "Radiofréquence (RF) et Télécom",
+    "nom": "Atténuation Globale (Perte d'Insertion)",
+    "formule": "IL(dB) = 10 * log10(P_in / P_out)",
+    "description": "Perte de signal mesurée entre l'entrée et la sortie d'un système."
+  },
+  {
+    "id": 101,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Amplificateur d'Instrumentation (3 AOP)",
+    "formule": "V_out = (V_in+ - V_in-) * (1 + (2 * R_1 / R_gain)) * (R_3 / R_2)",
+    "description": "Gain très précis et CMRR élevé pour les capteurs, réglable via une seule résistance (R_gain)."
+  },
+  {
+    "id": 102,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Convertisseur Courant-Tension (Transimpédance)",
+    "formule": "V_out = - I_in * R_f",
+    "description": "Convertit un très faible courant (ex: photodiode) en tension."
+  },
+  {
+    "id": 103,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Convertisseur Tension-Courant (Source de Howland)",
+    "formule": "I_out = V_in / R",
+    "description": "Génère un courant constant indépendant de l'impédance de la charge (si les ratios de résistances sont équilibrés)."
+  },
+  {
+    "id": 104,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Comparateur à Hystérésis (Trigger de Schmitt Inverseur - Seuil Haut)",
+    "formule": "V_th_haut = V_sat+ * (R_1 / (R_1 + R_2))",
+    "description": "Seuil de basculement supérieur pour un signal bruité."
+  },
+  {
+    "id": 105,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Comparateur à Hystérésis (Trigger de Schmitt Inverseur - Seuil Bas)",
+    "formule": "V_th_bas = V_sat- * (R_1 / (R_1 + R_2))",
+    "description": "Seuil de basculement inférieur pour un signal bruité."
+  },
+  {
+    "id": 106,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Filtre Actif Sallen-Key (Passe-Bas, 2nd ordre)",
+    "formule": "f_c = 1 / (2 * pi * sqrt(R_1 * R_2 * C_1 * C_2))",
+    "description": "Fréquence de coupure pour un filtre actif de structure Sallen-Key."
+  },
+  {
+    "id": 107,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Facteur d'amortissement (Sallen-Key Passe-Bas)",
+    "formule": "m = 0.5 * sqrt((C_2 / C_1)) * ((R_1 + R_2) / sqrt(R_1 * R_2))",
+    "description": "Définit le comportement du filtre autour de la fréquence de coupure (Butterworth, Tchebychev...)."
+  },
+  {
+    "id": 108,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Oscillateur à Pont de Wien",
+    "formule": "f_0 = 1 / (2 * pi * R * C)",
+    "description": "Fréquence d'oscillation d'un générateur de signal sinusoïdal (avec R1=R2=R et C1=C2=C)."
+  },
+  {
+    "id": 109,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Condition d'Oscillation (Pont de Wien)",
+    "formule": "R_f / R_in >= 2",
+    "description": "Le gain de l'amplificateur doit compenser l'atténuation de 1/3 du réseau RC pour maintenir l'oscillation."
+  },
+  {
+    "id": 110,
+    "categorie": "Amplificateurs Opérationnels (Avancé)",
+    "nom": "Redresseur Sans Seuil (Super Diode)",
+    "formule": "V_out = V_in (si V_in > 0), 0 (si V_in < 0)",
+    "description": "Redressement d'un signal alternatif en s'affranchissant de la chute de tension (0.7V) d'une diode classique."
+  },
+  {
+    "id": 111,
+    "categorie": "Amplificateurs Opérationnels (Montages Linéaires)",
+    "nom": "Sommateur Non-Inverseur (2 entrées)",
+    "formule": "V_out = (1 + R_f / R_g) * ((V_1 * R_2 + V_2 * R_1) / (R_1 + R_2))",
+    "description": "Additionne deux tensions sans inverser la phase. Souvent simplifié avec R1 = R2."
+  },
+  {
+    "id": 112,
+    "categorie": "Amplificateurs Opérationnels (Montages Linéaires)",
+    "nom": "Intégrateur Pratique (avec résistance en parallèle)",
+    "formule": "V_out = - (R_f / R_in) * (1 / (1 + j * omega * R_f * C)) * V_in",
+    "description": "Intégrateur avec une résistance R_f pour éviter la saturation due aux courants de biais."
+  },
+  {
+    "id": 113,
+    "categorie": "Amplificateurs Opérationnels (Montages Linéaires)",
+    "nom": "Dérivateur Pratique (avec résistance en série)",
+    "formule": "V_out = - (j * omega * R * C) / (1 + j * omega * R_in * C) * V_in",
+    "description": "Dérivateur avec une résistance R_in pour limiter le gain à haute fréquence et réduire le bruit."
+  },
+  {
+    "id": 114,
+    "categorie": "Amplificateurs Opérationnels (Montages Linéaires)",
+    "nom": "Amplificateur d'Instrumentation (2 AOP)",
+    "formule": "V_out = (V_2 - V_1) * (1 + R_2 / R_1)",
+    "description": "Alternative économique au montage à 3 AOP, nécessite des résistances très bien appariées."
+  },
+  {
+    "id": 115,
+    "categorie": "Amplificateurs Opérationnels (Montages Linéaires)",
+    "nom": "Convertisseur d'Impédance Négative (NIC)",
+    "formule": "Z_in = - Z * (R_1 / R_2)",
+    "description": "Crée une impédance d'entrée négative, annulant la résistance positive d'un circuit."
+  },
+  {
+    "id": 116,
+    "categorie": "Amplificateurs Opérationnels (Montages Linéaires)",
+    "nom": "Source de Courant Constante (Charge Flottante)",
+    "formule": "I_load = V_in / R",
+    "description": "Génère un courant constant dans une charge connectée dans la boucle de contre-réaction."
+  },
+  {
+    "id": 117,
+    "categorie": "Amplificateurs Opérationnels (Montages Non-Linéaires)",
+    "nom": "Amplificateur Logarithmique",
+    "formule": "V_out = - V_t * ln(V_in / (R * I_s))",
+    "description": "La tension de sortie est proportionnelle au logarithme de la tension d'entrée (utilise une diode ou un transistor)."
+  },
+  {
+    "id": 118,
+    "categorie": "Amplificateurs Opérationnels (Montages Non-Linéaires)",
+    "nom": "Amplificateur Exponentiel (Anti-Logarithmique)",
+    "formule": "V_out = - R * I_s * e^(V_in / V_t)",
+    "description": "Réalise la fonction inverse de l'amplificateur logarithmique."
+  },
+  {
+    "id": 119,
+    "categorie": "Amplificateurs Opérationnels (Montages Non-Linéaires)",
+    "nom": "Redresseur Double Alternance (Précision)",
+    "formule": "V_out = |V_in|",
+    "description": "Redresse les deux alternances d'un signal alternatif sans la chute de tension des diodes classiques."
+  },
+  {
+    "id": 120,
+    "categorie": "Amplificateurs Opérationnels (Montages Non-Linéaires)",
+    "nom": "Détecteur de Crête",
+    "formule": "V_out = max(V_in(t))",
+    "description": "Mémorise la valeur maximale atteinte par le signal d'entrée (utilise une diode et un condensateur)."
+  },
+  {
+    "id": 121,
+    "categorie": "Amplificateurs Opérationnels (Montages Non-Linéaires)",
+    "nom": "Trigger de Schmitt Non-Inverseur (Seuil Haut)",
+    "formule": "V_th_haut = V_sat+ * (R_1 / R_2)",
+    "description": "Tension de basculement vers le bas lorsque l'entrée dépasse ce seuil positif."
+  },
+  {
+    "id": 122,
+    "categorie": "Amplificateurs Opérationnels (Montages Non-Linéaires)",
+    "nom": "Trigger de Schmitt Non-Inverseur (Seuil Bas)",
+    "formule": "V_th_bas = V_sat- * (R_1 / R_2)",
+    "description": "Tension de basculement vers le haut lorsque l'entrée descend sous ce seuil négatif."
+  },
+  {
+    "id": 123,
+    "categorie": "Amplificateurs Opérationnels (Générateurs de Signaux)",
+    "nom": "Multivibrateur Astable (Générateur Carré) - Période",
+    "formule": "T = 2 * R * C * ln((1 + beta) / (1 - beta))",
+    "description": "Période d'oscillation du signal carré, avec beta = R_1 / (R_1 + R_2)."
+  },
+  {
+    "id": 124,
+    "categorie": "Amplificateurs Opérationnels (Générateurs de Signaux)",
+    "nom": "Générateur de Signal Triangulaire - Fréquence",
+    "formule": "f = R_2 / (4 * R_1 * R * C)",
+    "description": "Combine un comparateur à hystérésis et un intégrateur pour générer un triangle."
+  },
+  {
+    "id": 125,
+    "categorie": "Amplificateurs Opérationnels (Générateurs de Signaux)",
+    "nom": "Oscillateur à Déphasage (Phase-Shift)",
+    "formule": "f_0 = 1 / (2 * pi * R * C * sqrt(6))",
+    "description": "Fréquence d'oscillation d'un générateur sinusoïdal utilisant 3 cellules RC."
+  },
+  {
+    "id": 126,
+    "categorie": "Amplificateurs Opérationnels (Générateurs de Signaux)",
+    "nom": "Condition de Gain (Oscillateur à Déphasage)",
+    "formule": "R_f / R_in >= 29",
+    "description": "Le gain de l'AOP doit être d'au moins 29 pour compenser l'atténuation du triple réseau RC."
+  },
+  {
+    "id": 127,
+    "categorie": "Amplificateurs Opérationnels (Filtres Actifs)",
+    "nom": "Filtre Sallen-Key Passe-Haut",
+    "formule": "f_c = 1 / (2 * pi * sqrt(R_1 * R_2 * C_1 * C_2))",
+    "description": "Fréquence de coupure pour la topologie passe-haut de Sallen-Key."
+  },
+  {
+    "id": 128,
+    "categorie": "Amplificateurs Opérationnels (Filtres Actifs)",
+    "nom": "Filtre à Rétroaction Multiple (MFB) Passe-Bas",
+    "formule": "f_c = 1 / (2 * pi * sqrt(R_2 * R_3 * C_1 * C_2))",
+    "description": "Fréquence de coupure pour le filtre actif MFB (inverseur)."
+  },
+  {
+    "id": 129,
+    "categorie": "Amplificateurs Opérationnels (Filtres Actifs)",
+    "nom": "Filtre à Rétroaction Multiple (MFB) Passe-Bande - Fréq. Centrale",
+    "formule": "f_0 = 1 / (2 * pi * C * sqrt(R_p * R_3))",
+    "description": "Fréquence de résonance du filtre passe-bande, avec R_p = (R_1 * R_2) / (R_1 + R_2)."
+  },
+  {
+    "id": 130,
+    "categorie": "Amplificateurs Opérationnels (Caractéristiques Temporelles/Fréquentielles)",
+    "nom": "Bande Passante en Boucle Fermée",
+    "formule": "BW_closed = GBP / A_v",
+    "description": "La bande passante utile d'un montage est égale au Produit Gain-Bande divisé par le gain du montage en boucle fermée."
+  },
+  {
+    "id": 131,
+    "categorie": "Lois Fondamentales",
+    "nom": "Théorème de Millman",
+    "formule": "V_M = sum(V_i / R_i) / sum(1 / R_i)",
+    "description": "Calcule rapidement le potentiel d'un nœud commun à plusieurs branches en parallèle."
+  },
+  {
+    "id": 132,
+    "categorie": "Lois Fondamentales",
+    "nom": "Transformation Triangle-Étoile (Kennelly)",
+    "formule": "R_A = (R_AB * R_AC) / (R_AB + R_BC + R_AC)",
+    "description": "Convertit un réseau de résistances en triangle (Pi) vers un réseau en étoile (T)."
+  },
+  {
+    "id": 133,
+    "categorie": "Thermique et Dissipation",
+    "nom": "Température de Jonction",
+    "formule": "T_j = T_a + P_d * R_th_ja",
+    "description": "Température interne du composant (T_j) selon la température ambiante (T_a), la puissance dissipée (P_d) et la résistance thermique (R_th_ja)."
+  },
+  {
+    "id": 134,
+    "categorie": "Thermique et Dissipation",
+    "nom": "Loi d'Ohm Thermique Globale",
+    "formule": "R_th_ja = R_th_jc + R_th_cr + R_th_ra",
+    "description": "Addition des résistances thermiques (Jonction-Boîtier, Boîtier-Radiateur, Radiateur-Ambiant) en série."
+  },
+  {
+    "id": 135,
+    "categorie": "Conversion Mixte (CAN / CNA)",
+    "nom": "Résolution / Quantum (LSB)",
+    "formule": "V_LSB = V_ref / (2^n)",
+    "description": "Plus petite variation de tension mesurable par un convertisseur de 'n' bits."
+  },
+  {
+    "id": 136,
+    "categorie": "Conversion Mixte (CAN / CNA)",
+    "nom": "SNR Théorique d'un CAN",
+    "formule": "SNR(dB) = 6.02 * n + 1.76",
+    "description": "Rapport signal sur bruit maximal idéal imposé par le bruit de quantification d'un CAN à n bits."
+  },
+  {
+    "id": 137,
+    "categorie": "Conversion Mixte (CAN / CNA)",
+    "nom": "Théorème d'Échantillonnage (Nyquist-Shannon)",
+    "formule": "f_s >= 2 * f_max",
+    "description": "La fréquence d'échantillonnage doit être au moins le double de la fréquence maximale du signal pour éviter le repliement de spectre (aliasing)."
+  },
+  {
+    "id": 138,
+    "categorie": "Alimentation et Puissance",
+    "nom": "Autonomie d'une Batterie",
+    "formule": "t = (C * Profondeur_Decharge) / I_moy",
+    "description": "Temps de fonctionnement estimé selon la capacité (C en Ah), la décharge autorisée et le courant moyen."
+  },
+  {
+    "id": 139,
+    "categorie": "Électromécanique (Moteurs DC)",
+    "nom": "Vitesse de Rotation (Moteur DC)",
+    "formule": "Omega = (V - R * I) / k_e",
+    "description": "Vitesse angulaire selon la tension d'alimentation (V), la chute ohmique interne et la constante de force contre-électromotrice."
+  },
+  {
+    "id": 140,
+    "categorie": "Électromécanique (Moteurs DC)",
+    "nom": "Couple Électromagnétique",
+    "formule": "C_em = k_t * I",
+    "description": "Couple mécanique généré, proportionnel au courant d'induit via la constante de couple (k_t)."
+  },
+  {
+    "id": 141,
+    "categorie": "Électronique Numérique et Logique",
+    "nom": "Théorème de De Morgan (NOR)",
+    "formule": "/(A + B) = /A * /B",
+    "description": "L'inverse d'une somme logique est le produit logique des inverses."
+  },
+  {
+    "id": 142,
+    "categorie": "Électronique Numérique et Logique",
+    "nom": "Théorème de De Morgan (NAND)",
+    "formule": "/(A * B) = /A + /B",
+    "description": "L'inverse d'un produit logique est la somme logique des inverses."
+  },
+  {
+    "id": 143,
+    "categorie": "Électronique Numérique et Logique",
+    "nom": "OU Exclusif (XOR)",
+    "formule": "Y = A * /B + /A * B",
+    "description": "La sortie est à l'état haut uniquement si les deux entrées ont des états différents."
+  },
+  {
+    "id": 144,
+    "categorie": "Électronique Numérique et Logique",
+    "nom": "Consommation Dynamique CMOS",
+    "formule": "P_dyn = C_load * V_dd^2 * f",
+    "description": "Puissance dissipée lors des commutations des portes logiques CMOS."
+  },
+  {
+    "id": 145,
+    "categorie": "Électronique Numérique et Logique",
+    "nom": "Loi d'Absorption (Algèbre de Boole)",
+    "formule": "A + (A * B) = A",
+    "description": "Simplification d'une équation logique où un terme englobe l'autre."
+  },
+  {
+    "id": 146,
+    "categorie": "Électronique Numérique et Logique",
+    "nom": "Loi d'Adjacence (Algèbre de Boole)",
+    "formule": "A * B + A * /B = A",
+    "description": "Principe fondamental utilisé pour la simplification dans les tableaux de Karnaugh."
+  },
+  {
+    "id": 147,
+    "categorie": "Électronique Numérique et Logique",
+    "nom": "Équation d'un Multiplexeur 2 vers 1",
+    "formule": "Y = (A * /S) + (B * S)",
+    "description": "Sélectionne l'entrée A si S=0, ou l'entrée B si S=1."
+  },
+  {
+    "id": 148,
+    "categorie": "Électronique Numérique et Logique",
+    "nom": "Lois d'Inversion et d'Identité",
+    "formule": "A + /A = 1, A * /A = 0",
+    "description": "Lois de base démontrant la complémentarité des variables booléennes."
+  },
+  {
+    "id": 149,
+    "categorie": "Amplificateurs Opérationnels (Spécialisés)",
+    "nom": "Gyrator (Simulateur d'Inductance)",
+    "formule": "L_eq = R_1 * R_2 * C",
+    "description": "Utilise un condensateur et un AOP pour simuler le comportement d'une inductance (très utile pour éviter de souder de grosses bobines physiques)."
+  },
+  {
+    "id": 150,
+    "categorie": "Amplificateurs Opérationnels (Spécialisés)",
+    "nom": "Amplificateur de Charge",
+    "formule": "V_out = - Q / C_f",
+    "description": "Convertit la charge électrique (Q) générée par un capteur capacitif (ex: accéléromètre piézoélectrique) en une tension lisible."
+  },
+  {
+    "id": 151,
+    "categorie": "Amplificateurs Opérationnels (Filtres Actifs)",
+    "nom": "Filtre Coupe-Bande (Notch / Cellule en Double-T)",
+    "formule": "f_0 = 1 / (2 * pi * R * C)",
+    "description": "Filtre conçu pour rejeter une fréquence parasite très spécifique (classiquement utilisé pour éliminer le bruit du secteur 50Hz ou 60Hz)."
+  },
+  {
+    "id": 152,
+    "categorie": "Amplificateurs Opérationnels (Spécialisés)",
+    "nom": "Convertisseur d'Impédance Généralisé (GIC)",
+    "formule": "Z_in = (Z_1 * Z_3 * Z_5) / (Z_2 * Z_4)",
+    "description": "Topologie avancée utilisant 2 AOP pour synthétiser des impédances complexes idéales, souvent utilisée dans les filtres actifs d'ordre très élevé."
+  }
+]

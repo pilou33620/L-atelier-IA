@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# API Keys & Secrets
+cle_api.txt
+cle_api_2.txt
+cle_api_claude.txt
+.env
+secret*.txt
+
+# Project specific
+.agent_backups/
+.agent_recovery.json
+agent_demo_coder/
+agent_demo_hardware/
+agent_demo_general/
+agent_demo_meca/
+graphify-out/
+data_sheets/
+test.txt
+help.txt
