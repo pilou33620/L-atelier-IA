@@ -332,12 +332,97 @@ class ConnectionDialog(QDialog):
         self.demo_checkbox = QCheckBox("🧪 Activer le Mode Démonstration (Dossier temporaire, Gemma 31B)")
         layout.addWidget(self.demo_checkbox)
         
+        layout.addSpacing(10)
+        self.github_btn = QPushButton("🐙 GitHub")
+        self.github_btn.setToolTip("Afficher les tutoriels GitHub (Création et Mise à jour)")
+        self.github_btn.clicked.connect(self.show_github_tutorials)
+        layout.addWidget(self.github_btn)
+        
         layout.addStretch()
 
         btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
         layout.addWidget(btn_box)
+
+    def show_github_tutorials(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Tutoriels GitHub - L'Atelier IA")
+        dialog.resize(600, 550)
+        
+        layout = QVBoxLayout(dialog)
+        
+        msg = """<h3>🛑 Manuel de création d'un dépôt Git :</h3>
+<p><b>1. Création du dépôt distant (GitHub)</b></p>
+<ul>
+  <li>Connectez-vous à votre compte GitHub.</li>
+  <li>Cliquez sur "New" en haut à gauche.</li>
+  <li>Donnez un nom à votre dépôt.</li>
+  <li>Laissez les cases "Initialize this repository with..." décochées.</li>
+  <li>Cliquez sur "Create repository" et copiez l'URL du dépôt.</li>
+</ul>
+
+<p><b>2. Initialisation locale et envoi</b><br>
+Ouvrez votre terminal directement dans le dossier du projet et exécutez :</p>
+
+<pre style="background-color: #2d2d30; padding: 10px; font-family: Consolas, monospace; color: #ce9178; font-size: 14px; border-left: 3px solid #0e639c;"># 1. Initialiser le dossier comme un dépôt Git
+git init
+
+# 2. Ajouter tous les fichiers du dossier
+git add .
+
+# 3. Créer le premier point de sauvegarde (commit)
+git commit -m "Premier commit : initialisation du projet"
+
+# 4. Renommer la branche principale en 'main'
+git branch -M main
+
+# 5. Connecter le dossier local au dépôt distant (remplacez l'URL)
+git remote add origin https://github.com/votre-nom/nom-du-repo.git
+
+# 6. Envoyer vos fichiers vers GitHub
+git push -u origin main</pre>
+
+<hr>
+
+<h3>🚀 Commandes de mise à jour (Trio magique) :</h3>
+<p>1. Vérifier l'état de vos fichiers :<br>
+<code style="background-color: #2d2d30; padding: 4px; font-family: Consolas, monospace; color: #569cd6; font-size: 14px;">git status</code></p>
+
+<p>2. Préparer les modifications (Staging) :<br>
+<code style="background-color: #2d2d30; padding: 4px; font-family: Consolas, monospace; color: #569cd6; font-size: 14px;">git add .</code></p>
+
+<p>3. Enregistrer les modifications localement (Commit) :<br>
+<code style="background-color: #2d2d30; padding: 4px; font-family: Consolas, monospace; color: #569cd6; font-size: 14px;">git commit -m "Description de la modification apportée"</code></p>
+
+<p>4. Envoyer les modifications sur GitHub (Push) :<br>
+<code style="background-color: #2d2d30; padding: 4px; font-family: Consolas, monospace; color: #569cd6; font-size: 14px;">git push</code></p>"""
+        
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setHtml(msg)
+        layout.addWidget(text_edit)
+        
+        btn_layout = QHBoxLayout()
+        copy_btn = QPushButton("📋 Copier tout le texte")
+        copy_btn.setObjectName("Accent")
+        
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(text_edit.toPlainText())
+            copy_btn.setText("✅ Copié !")
+            QTimer.singleShot(2000, lambda: copy_btn.setText("📋 Copier tout le texte"))
+            
+        copy_btn.clicked.connect(copy_to_clipboard)
+        
+        close_btn = QPushButton("Fermer")
+        close_btn.clicked.connect(dialog.accept)
+        
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(close_btn)
+        
+        layout.addLayout(btn_layout)
+        dialog.exec()
 
     def get_selection(self):
         app_mode = "general"
