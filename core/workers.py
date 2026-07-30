@@ -766,17 +766,16 @@ class LiveAgentWorker(QThread):
         """
         candidates = []  # liste de (obj, origine) où origine ∈ {"markdown","raw"}
 
-        # 1) Tous les blocs ```json ... ``` (ou ``` ... ```) contenant un objet.
         for m in re.finditer(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL):
             try:
-                candidates.append((json.loads(m.group(1)), "markdown"))
+                candidates.append((json.loads(m.group(1), strict=False), "markdown"))
             except json.JSONDecodeError:
                 pass
 
         # 2) Balayage brut : tous les objets JSON de premier niveau du texte.
         #    raw_decode avance après chaque objet décodé, donc les objets
         #    imbriqués (args, etc.) ne sont pas comptés séparément.
-        decoder = json.JSONDecoder()
+        decoder = json.JSONDecoder(strict=False)
         idx = 0
         while True:
             start = text.find('{', idx)
@@ -809,7 +808,7 @@ class LiveAgentWorker(QThread):
             return None, "ambiguous"
 
         only_key = next(iter(seen))
-        obj = json.loads(only_key)
+        obj = json.loads(only_key, strict=False)
         status = "success_markdown" if seen[only_key] == "markdown" else "fallback_raw"
         return obj, status
 
