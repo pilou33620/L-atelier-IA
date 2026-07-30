@@ -222,6 +222,7 @@ class NodeItem(QGraphicsObject):
         # Information for synthetic display
         self.exchanged_files = []
         self.reports = []
+        self.used_tools = {}
 
         # Animation for active states
         self.glow_anim = QVariantAnimation(self)
@@ -231,6 +232,22 @@ class NodeItem(QGraphicsObject):
         self.glow_anim.setLoopCount(-1)  # Infinite
         self.glow_anim.valueChanged.connect(self._update_glow)
         
+    def _recalc_size(self):
+        h = 90
+        if self.exchanged_files:
+            h += 20 + len(self.exchanged_files) * 22
+        if self.reports:
+            h += 26 + len(self.reports) * 22
+        if self.used_tools:
+            h += 26 + min(len(self.used_tools), 3) * 22
+        self.prepareGeometryChange()
+        self.height = max(160, h)
+        self.update()
+
+    def add_tool(self, tool_name):
+        self.used_tools[tool_name] = self.used_tools.get(tool_name, 0) + 1
+        self._recalc_size()
+
     def add_edge(self, edge):
         self.edges.append(edge)
 
@@ -242,14 +259,14 @@ class NodeItem(QGraphicsObject):
             self.exchanged_files.append({"name": filename, "action": action_type})
             if len(self.exchanged_files) > 3:
                 self.exchanged_files.pop(0)
-            self.update()
+            self._recalc_size()
             
     def add_report(self, report_name):
         if report_name not in self.reports:
             self.reports.append(report_name)
             if len(self.reports) > 2:
                 self.reports.pop(0)
-            self.update()
+            self._recalc_size()
 
     def set_state(self, state):
         self.state = state
@@ -392,6 +409,27 @@ class NodeItem(QGraphicsObject):
                 
                 painter.setPen(QPen(QColor(150, 255, 180)))
                 painter.drawText(pill_rect, Qt.AlignmentFlag.AlignCenter, r_name)
+                y_offset += 22
+
+        if self.used_tools:
+            if self.exchanged_files or self.reports:
+                y_offset += 6
+            painter.setPen(QPen(QColor(180, 190, 210)))
+            painter.drawText(QRectF(-self.width/2 + 15, y_offset, self.width-30, 15), Qt.AlignmentFlag.AlignLeft, "🛠️ Outils utilisés:")
+            y_offset += 20
+            
+            sorted_tools = sorted(self.used_tools.items(), key=lambda x: x[1], reverse=True)
+            for t_name, count in sorted_tools[:3]:
+                display_str = f"{t_name} x{count}"
+                fm = painter.fontMetrics()
+                tw = fm.horizontalAdvance(display_str)
+                pill_rect = QRectF(-self.width/2 + 25, y_offset, tw + 10, 18)
+                painter.setBrush(QBrush(QColor(60, 50, 70)))
+                painter.setPen(QPen(QColor(100, 80, 120)))
+                painter.drawRoundedRect(pill_rect, 4, 4)
+                
+                painter.setPen(QPen(QColor(220, 200, 255)))
+                painter.drawText(pill_rect, Qt.AlignmentFlag.AlignCenter, display_str)
                 y_offset += 22
 
     def itemChange(self, change, value):
@@ -611,6 +649,7 @@ class NodeGraphWidget(QGraphicsView):
     def show_agent_action(self, agent_id, action_name, target):
         if agent_id in self.nodes:
             node = self.nodes[agent_id]
+            node.add_tool(action_name)
             
             # Update synthetic information dynamically
             if action_name in ("write_file", "edit_file", "multi_replace_file_content", "replace_file_content", "delete_file", "rename_file", "read_file", "list_dir", "read_image"):

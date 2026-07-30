@@ -1264,13 +1264,7 @@ git push -u origin main</pre>"""
         agents_scroll.setWidget(self.agents_container)
         af.addWidget(agents_scroll)
         
-        self.tools_header = QLabel("🛠️ Outils utilisés")
-        af.addWidget(self.tools_header)
-        
-        self.tools_list_widget = QListWidget()
-        self.tools_list_widget.setMaximumHeight(100)
-        self.tools_list_widget.setStyleSheet("background: #252526; border: 1px solid #3c3c3c; color: #d4d4d4;")
-        af.addWidget(self.tools_list_widget)
+
         
         self.chat_splitter.addWidget(self.agents_frame)
 
@@ -2306,8 +2300,6 @@ git push -u origin main</pre>"""
         self.live_worker.agent_action_event.connect(self.on_agent_action_event)
         self.live_worker.agent_changed.connect(self.node_graph.set_agent_active)
         self.node_graph.reset_graph()
-        if hasattr(self, 'tools_list_widget'):
-            self.tools_list_widget.clear()
         self.agent_tool_usage = {}
         self.thinking_anim.start_anim()
         self.progress_bar_live.start_anim()
@@ -2703,14 +2695,7 @@ git push -u origin main</pre>"""
             self._graphify_build_worker.wait()
 
     def on_agent_action_event(self, agent_id, action_name, target):
-        if not hasattr(self, 'agent_tool_usage'):
-            self.agent_tool_usage = {}
-        self.agent_tool_usage[action_name] = self.agent_tool_usage.get(action_name, 0) + 1
-        
-        if hasattr(self, 'tools_list_widget'):
-            self.tools_list_widget.clear()
-            for tool, count in sorted(self.agent_tool_usage.items(), key=lambda x: x[1], reverse=True):
-                self.tools_list_widget.addItem(f"{tool} x{count}")
+        pass
 
     def _on_swarm_toggled(self, state):
         is_checked = (state == 2) or (state is True)
@@ -2941,6 +2926,25 @@ git push -u origin main</pre>"""
         stats_lbl = QLabel(stats_text)
         stats_lbl.setWordWrap(True)
         scroll_layout.addWidget(stats_lbl)
+        
+        # 2.5 Outils utilisés
+        tools_title = QLabel("🛠️ Outils utilisés")
+        tools_title.setObjectName("SectionTitle")
+        scroll_layout.addWidget(tools_title)
+        
+        node_tools = {}
+        if hasattr(self, 'node_graph') and agent_id in self.node_graph.nodes:
+            node_tools = getattr(self.node_graph.nodes[agent_id], 'used_tools', {})
+            
+        if node_tools:
+            tools_lines = [f"<li><b>{t}</b> : {c} fois</li>" for t, c in sorted(node_tools.items(), key=lambda x: x[1], reverse=True)]
+            tools_text = f"<ul style='margin-top: 5px; margin-bottom: 10px; padding-left: 20px; color: #d4d4d4;'>" + "".join(tools_lines) + "</ul>"
+        else:
+            tools_text = "<i style='color: #888; margin-top: 5px; margin-bottom: 10px; display: block;'>Aucun outil utilisé.</i>"
+            
+        tools_lbl = QLabel(tools_text)
+        tools_lbl.setWordWrap(True)
+        scroll_layout.addWidget(tools_lbl)
         
         # 3. Réseau de communication
         comm_title = QLabel("🔄 Réseau de communication")
