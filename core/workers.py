@@ -762,15 +762,21 @@ class LiveAgentWorker(QThread):
         distinctes coexistent on refuse l'ambiguïté au lieu d'en choisir une.
 
         Renvoie (obj|None, status) avec status dans :
-          "success_markdown" | "fallback_raw" | "ambiguous" | "error".
+          "success_markdown" | "fallback_raw" | "ambiguous" | "error" | "error: <detail>".
         """
+        # --- ASSAINISSEMENT JSON ---
+        # Remplace les antislashs non échappés (fréquents dans les chemins Windows) 
+        # par des doubles antislashs, en préservant les échappements JSON valides.
+        text = re.sub(r'\\(?![\\/bfnrtu"])', r'\\\\', text)
+
         candidates = []  # liste de (obj, origine) où origine ∈ {"markdown","raw"}
+        last_error = None
 
         for m in re.finditer(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL):
             try:
                 candidates.append((json.loads(m.group(1), strict=False), "markdown"))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                last_error = str(e)
 
         # 2) Balayage brut : tous les objets JSON de premier niveau du texte.
         #    raw_decode avance après chaque objet décodé, donc les objets
@@ -785,13 +791,19 @@ class LiveAgentWorker(QThread):
                 obj, offset = decoder.raw_decode(text[start:])
                 candidates.append((obj, "raw"))
                 idx = start + offset
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                if not last_error:
+                    last_error = str(e)
                 idx = start + 1
 
         # On ne retient que les objets porteurs d'une clé "action".
         actions = [(obj, origin) for (obj, origin) in candidates
                    if isinstance(obj, dict) and "action" in obj]
         if not actions:
+            if last_error:
+                return None, f"error: {last_error}"
+            if candidates:
+                return None, "error: JSON valide trouvé mais la clé 'action' est manquante. Format attendu : {\"action\": \"nom_de_l_action\", \"args\": {...}}"
             return None, "error"
 
         # Dédoublonnage : un même objet peut apparaître via markdown ET via le
@@ -1638,6 +1650,7 @@ class LiveAgentWorker(QThread):
                 agent_config = AGENTS_CONFIG.get(current_agent_id, {})
                 name = agent_config.get("name", current_agent_id)
                 system_prompt = (self.extra_rules + "\n\n" if self.extra_rules else "") + agent_config.get("system_prompt", "")
+                system_prompt = system_prompt.replace("Réponds UNIQUEMENT avec l'objet JSON, sans texte ni balises Markdown autour.", "")
                 system_prompt += "\n\nRÈGLE ABSOLUE : Tu dois IMPÉRATIVEMENT et UNIQUEMENT communiquer et rédiger tes explications en français (même si le code, les logs ou la documentation sont en anglais)."
                 system_prompt += "\n\nRÈGLE OBLIGATOIRE : Lorsque tu lis un fichier PDF et qu'il y a une capture d'écran associée, tu dois OBLIGATOIREMENT regarder l'image."
                 # BUGFIX (V4.4.0) : l'ancienne règle exigeait « d'envoyer un
@@ -1650,10 +1663,13 @@ class LiveAgentWorker(QThread):
                                   "(run_tests, graphify_*) déclenche une fenêtre de validation "
                                   "côté utilisateur. Si une explication est nécessaire, mets-la dans le champ "
                                   "approprié de ton unique action JSON (ex: le 'context' d'un delegate).")
-                system_prompt += ("\n\nRÈGLE CRITIQUE DE FORMAT : Ton message DOIT contenir l'action à exécuter au format JSON. "
-                                  "Tu ES AUTORISÉ à réfléchir (Chain of Thought) en texte libre AVANT ton action JSON. "
+                system_prompt += ("\n\nRÈGLE CRITIQUE DE FORMAT : Ton message DOIT contenir l'action à exécuter au format JSON STRICT. "
+                                  "Tu NE DOIS PAS écrire de texte libre en dehors de l'objet JSON. "
+                                  "Si tu dois réfléchir, ajoute une clé 'thought' DANS ton objet JSON. "
                                   "L'action JSON doit contenir la clé 'action' et peut être encadrée par des balises markdown ```json. "
-                                  "Tu ne dois fournir qu'UNE SEULE action JSON par réponse.")
+                                  "Tu ne dois fournir qu'UNE SEULE action JSON par réponse.\n"
+                                  "⚠️ IMPORTANT : Utilise TOUJOURS des guillemets doubles (\") et JAMAIS de guillemets simples ('). "
+                                  "Pour les chemins Windows, n'oublie jamais de doubler les antislashs (ex: C:\\\\dossier\\\\fichier).")
                 self.status_update.emit(f"\n=========================================\n 🔄 Passation à : {name} ({model})\n=========================================\n")
                 self.agent_changed.emit(current_agent_id)
 
@@ -1767,7 +1783,7 @@ class LiveAgentWorker(QThread):
                     
                     self._append_to_history(current_agent_id, {"role": "assistant", "content": response})
                     action, parse_status = self.extract_action(response)
-                    if parse_status == "error" or parse_status == "fallback_raw":
+                    if parse_status == "error" or (isinstance(parse_status, str) and parse_status.startswith("error:")):
                         self.agent_state_changed.emit(current_agent_id, "error")
 
                     if parse_status == "ambiguous":
@@ -1780,12 +1796,17 @@ class LiveAgentWorker(QThread):
                         continue
 
                     if action is None:
-                        self._append_to_history(current_agent_id, {"role": "user", "content": "ERREUR: Réponse non-JSON. Tu dois répondre uniquement avec un bloc JSON valide."})
+                        err_msg = "ERREUR: Aucun objet JSON d'action valide trouvé dans ta réponse."
+                        if isinstance(parse_status, str) and parse_status.startswith("error: "):
+                            err_msg += f"\n\nDétail de l'erreur JSON : {parse_status[7:]}\n\n⚠️ CONSEIL: Si tu inclus du texte avec des guillemets doubles (\") ou des retours à la ligne dans ton JSON, tu DOIS impérativement les échapper (\\\" ou \\n)."
+                            err_msg += "\n⚠️ RAPPEL: Assure-toi d'utiliser des guillemets DOUBLES (\") et de doubler tes antislashs pour les chemins Windows (\\\\)."
+                            
+                        self._append_to_history(current_agent_id, {"role": "user", "content": err_msg})
                         self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Réponse non-JSON, on redemande...\n")
                         continue
                         
                     if parse_status == "fallback_raw":
-                        self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Action extraite via fallback (hors bloc markdown).\n")
+                        self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] ℹ️ Action extraite via fallback (hors bloc markdown).\n")
 
                     act_name = action.get("action")
                     args = action.get("args", {}) or {}

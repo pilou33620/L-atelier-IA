@@ -24,23 +24,34 @@ logger = logging.getLogger(__name__)
 
 def resolve_slash_command(text):
     text = text.strip()
-    if text.startswith("/"):
+    if not text.startswith("/"):
+        return text
+
+    prompts_dir = os.path.join(os.path.dirname(__file__), "skills")
+    resolved_contents = []
+
+    while text.startswith("/"):
         parts = text.split(maxsplit=1)
         command = parts[0][1:]
-        args = parts[1] if len(parts) > 1 else ""
-        
-        prompts_dir = os.path.join(os.path.dirname(__file__), "skills")
         cmd_file = os.path.join(prompts_dir, f"{command}.md")
-        
+
         if os.path.exists(cmd_file):
             try:
                 with open(cmd_file, "r", encoding="utf-8") as f:
-                    content = f.read()
-                if args:
-                    return f"{content}\n\nArguments fournis : {args}"
-                return content
+                    resolved_contents.append(f.read())
             except Exception as e:
                 logger.error(f"Erreur chargement commande {command}: {e}")
+                break
+            
+            text = parts[1].strip() if len(parts) > 1 else ""
+        else:
+            break
+
+    if resolved_contents:
+        if text:
+            resolved_contents.append(f"Arguments fournis :\n{text}")
+        return "\n\n".join(resolved_contents)
+
     return text
 
 DARK_QSS = """
@@ -151,8 +162,12 @@ class ChatInputWidget(QTextEdit):
     def check_completion(self):
         text = self.toPlainText()
         cursor = self.textCursor()
-        if text.startswith("/") and len(text.split()) <= 1 and cursor.position() == len(text):
-            word = text.strip()
+        text_before_cursor = text[:cursor.position()]
+        
+        last_space_idx = max(text_before_cursor.rfind(' '), text_before_cursor.rfind('\n'))
+        word = text_before_cursor[last_space_idx + 1:]
+        
+        if word.startswith("/") and not text_before_cursor.endswith(" ") and not text_before_cursor.endswith("\n"):
             matches = [s for s in self.skills if s.startswith(word)]
             if matches:
                 self.completer_list.clear()
@@ -170,10 +185,20 @@ class ChatInputWidget(QTextEdit):
         self.completer_list.hide()
         
     def insert_completion(self, item):
-        self.setPlainText(item.text() + " ")
         cursor = self.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        self.setTextCursor(cursor)
+        text = self.toPlainText()
+        cursor_pos = cursor.position()
+        text_before_cursor = text[:cursor_pos]
+        
+        last_space_idx = max(text_before_cursor.rfind(' '), text_before_cursor.rfind('\n'))
+        
+        new_text = text[:last_space_idx + 1] + item.text() + " " + text[cursor_pos:]
+        self.setPlainText(new_text)
+        
+        new_cursor = self.textCursor()
+        new_cursor.setPosition(last_space_idx + 1 + len(item.text()) + 1)
+        self.setTextCursor(new_cursor)
+        
         self.completer_list.hide()
         self.setFocus()
         
