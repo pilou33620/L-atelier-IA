@@ -10,3 +10,5 @@ beautifulsoup4
 cadquery
 CQ-Editor
 docker
+chromadb
+fastembed

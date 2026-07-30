@@ -1109,3 +1109,41 @@ except Exception as e:
         if not results:
             return f"Aucune empreinte trouvée pour '{keyword}'."
         return "\n".join(results)
+
+    def build_vector_index(self):
+        """Construit l'index RAG à partir du graph.json généré par Graphify."""
+        try:
+            from core.rag_engine import GraphRagEngine
+            engine = GraphRagEngine(self.root)
+            nb_indexed = engine.build_index()
+            return f"SUCCÈS: Index RAG construit avec {nb_indexed} nœuds."
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            return f"ERREUR lors de la construction de l'index RAG: {e}\n{tb}"
+
+    def search_codebase(self, query, top_k=3):
+        """
+        Recherche sémantique dans la codebase à l'aide de l'index RAG.
+        Renvoie le code pertinent ainsi que le contexte des dépendances.
+        """
+        try:
+            from core.rag_engine import GraphRagEngine
+            engine = GraphRagEngine(self.root)
+            results = engine.search(query, int(top_k))
+            
+            if not results:
+                return f"Aucun résultat pertinent trouvé pour '{query}'."
+                
+            output = []
+            for r in results:
+                entry = f"--- Nœud: {r['label']} (Fichier: {r['file']}, {r['location']}) ---\n"
+                if r['graph_context']:
+                    entry += "Contexte Graphify:\n" + "\n".join(["- " + c for c in r['graph_context']]) + "\n"
+                entry += "Code Source:\n" + r['content'] + "\n"
+                output.append(entry)
+                
+            return "\n".join(output)
+            
+        except Exception as e:
+            return f"ERREUR lors de la recherche dans la codebase: {e}"

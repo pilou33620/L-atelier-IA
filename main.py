@@ -124,6 +124,11 @@
 
 import sys
 import logging
+try:
+    import onnxruntime
+except ImportError:
+    pass
+
 from PyQt6.QtWidgets import QApplication, QDialog
 
 from ui import DARK_QSS, ConnectionDialog, MainWindow

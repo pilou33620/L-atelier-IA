@@ -649,6 +649,31 @@ class MainWindow(QMainWindow):
             self.add_system_message(f"❌ <b>Erreur Graphify</b> : {self._esc(str(result))}")
             QMessageBox.critical(self, "Erreur Graphify", str(result))
 
+    def run_index_rag(self):
+        if not self.sandbox:
+            QMessageBox.warning(self, "Erreur", "Ouvre d'abord un dossier projet.")
+            return
+            
+        self.index_rag_btn.setEnabled(False)
+        self.index_rag_btn.setText("⏳ Indexation...")
+        
+        # We can use a FunctionWorker to avoid freezing UI
+        worker = FunctionWorker(self.sandbox.build_vector_index)
+        worker.finished_task.connect(self._on_index_rag_finished)
+        worker.start()
+        # Keep a reference to prevent garbage collection
+        self._index_rag_worker = worker
+
+    def _on_index_rag_finished(self, success, result):
+        self.index_rag_btn.setEnabled(True)
+        self.index_rag_btn.setText("🧠 Index RAG")
+        if success and "SUCCÈS" in str(result):
+            self.add_system_message(f"🧠 <b>Index RAG généré !</b><br>{self._esc(str(result))}")
+            QMessageBox.information(self, "Index RAG", str(result))
+        else:
+            self.add_system_message(f"❌ <b>Erreur Indexation RAG</b> : {self._esc(str(result))}")
+            QMessageBox.critical(self, "Erreur", str(result))
+
     def run_github_helper(self):
         if not self.sandbox:
             QMessageBox.warning(self, "Erreur", "Ouvre d'abord un dossier projet.")
@@ -1006,6 +1031,13 @@ git push -u origin main</pre>"""
             self.graphify_btn.hide()
         btn_layout.addWidget(self.graphify_btn)
         
+        self.index_rag_btn = QPushButton("🧠 Index RAG")
+        self.index_rag_btn.setToolTip("Construire l'index vectoriel RAG depuis graph.json")
+        self.index_rag_btn.clicked.connect(self.run_index_rag)
+        if self.app_mode != "coder":
+            self.index_rag_btn.hide()
+        btn_layout.addWidget(self.index_rag_btn)
+        
         icons_layout = QHBoxLayout()
         icons_layout.setSpacing(4)
         
@@ -1146,6 +1178,15 @@ git push -u origin main</pre>"""
         
         agents_scroll.setWidget(self.agents_container)
         af.addWidget(agents_scroll)
+        
+        self.tools_header = QLabel("🛠️ Outils utilisés")
+        af.addWidget(self.tools_header)
+        
+        self.tools_list_widget = QListWidget()
+        self.tools_list_widget.setMaximumHeight(100)
+        self.tools_list_widget.setStyleSheet("background: #252526; border: 1px solid #3c3c3c; color: #d4d4d4;")
+        af.addWidget(self.tools_list_widget)
+        
         self.chat_splitter.addWidget(self.agents_frame)
 
         self.chat_view = QTextEdit(); self.chat_view.setObjectName("Chat"); self.chat_view.setReadOnly(True)
@@ -2177,8 +2218,12 @@ git push -u origin main</pre>"""
         self.live_worker.data_flow_event.connect(self.node_graph.trigger_data_flow)
         self.live_worker.agent_state_changed.connect(self.node_graph.update_agent_state)
         self.live_worker.agent_action_event.connect(self.node_graph.show_agent_action)
+        self.live_worker.agent_action_event.connect(self.on_agent_action_event)
         self.live_worker.agent_changed.connect(self.node_graph.set_agent_active)
         self.node_graph.reset_graph()
+        if hasattr(self, 'tools_list_widget'):
+            self.tools_list_widget.clear()
+        self.agent_tool_usage = {}
         self.thinking_anim.start_anim()
         self.progress_bar_live.start_anim()
         self.live_worker.start()
@@ -2571,6 +2616,16 @@ git push -u origin main</pre>"""
         if getattr(self, '_graphify_build_worker', None) and self._graphify_build_worker.isRunning():
             self._graphify_build_worker.cancel()
             self._graphify_build_worker.wait()
+
+    def on_agent_action_event(self, agent_id, action_name, target):
+        if not hasattr(self, 'agent_tool_usage'):
+            self.agent_tool_usage = {}
+        self.agent_tool_usage[action_name] = self.agent_tool_usage.get(action_name, 0) + 1
+        
+        if hasattr(self, 'tools_list_widget'):
+            self.tools_list_widget.clear()
+            for tool, count in sorted(self.agent_tool_usage.items(), key=lambda x: x[1], reverse=True):
+                self.tools_list_widget.addItem(f"{tool} x{count}")
 
     def _on_swarm_toggled(self, state):
         is_checked = (state == 2) or (state is True)
