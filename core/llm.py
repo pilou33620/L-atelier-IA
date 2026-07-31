@@ -571,11 +571,18 @@ class LLMProvider:
                     chat.add_user_message(msg["content"])
                 elif msg["role"] == "assistant":
                     chat.add_assistant_message(msg["content"])
+            emitted_text = ""
             for fragment in model.respond_stream(chat):
                 if is_cancelled_callback and is_cancelled_callback():
                     return
                 if fragment.content:
+                    emitted_text += fragment.content
                     yield "chunk", fragment.content
+            
+            # Estimation locale pour LM Studio (gratuit, mais utile pour suivre l'utilisation)
+            estimated_in = sum(_estimate_message_tokens(m) for m in messages) + _estimate_tokens(system_prompt or "")
+            estimated_out = _estimate_tokens(emitted_text)
+            yield "usage", {"input_tokens": estimated_in, "output_tokens": estimated_out}
 
         else:  # Google GenAI / Anthropic
             real_model_name, config_params = get_thinking_config(model_name)
@@ -698,6 +705,11 @@ class LLMProvider:
                             try:
                                 final = stream_ctx.get_final_message()
                                 stop_reason = getattr(final, "stop_reason", None)
+                                
+                                # Ajout : transmission des métadonnées d'utilisation pour Anthropic
+                                if hasattr(final, "usage") and final.usage:
+                                    yield "usage", final.usage
+                                    
                             except Exception:
                                 final = None
                                 stop_reason = None

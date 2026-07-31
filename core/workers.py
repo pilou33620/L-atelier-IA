@@ -781,14 +781,37 @@ class LiveAgentWorker(QThread):
                     # peuvent porter un usage_metadata PARTIEL (compteurs à
                     # None) -> TypeError dans le calcul de coût, qui faisait
                     # échouer TOUTE la mission pour un affichage cosmétique.
-                    p_tok = content.prompt_token_count or 0
-                    c_tok = content.candidates_token_count or 0
-                    t_tok = content.total_token_count or (p_tok + c_tok)
+                    # Extraction polymorphe des tokens (Google vs Anthropic vs LM Studio dict)
+                    if hasattr(content, "prompt_token_count") or hasattr(content, "candidates_token_count"):
+                        p_tok = getattr(content, "prompt_token_count", 0) or 0
+                        c_tok = getattr(content, "candidates_token_count", 0) or 0
+                        t_tok = getattr(content, "total_token_count", 0) or (p_tok + c_tok)
+                    elif hasattr(content, "input_tokens") or hasattr(content, "output_tokens"):
+                        p_tok = getattr(content, "input_tokens", 0) or 0
+                        c_tok = getattr(content, "output_tokens", 0) or 0
+                        t_tok = p_tok + c_tok
+                    elif isinstance(content, dict):
+                        p_tok = content.get("input_tokens", 0)
+                        c_tok = content.get("output_tokens", 0)
+                        t_tok = p_tok + c_tok
+                    else:
+                        p_tok = c_tok = t_tok = 0
+
                     cost_msg = ""
                     lower_model = model_name.lower()
                     # Tarifs $/Mtoken (entrée, sortie) — mis à jour 2026-07.
                     cost = 0.0
-                    if "pro" in lower_model:
+                    
+                    if "claude" in lower_model:
+                        if "opus" in lower_model:
+                            cost = (p_tok / 1_000_000 * 15.0) + (c_tok / 1_000_000 * 75.0)
+                        elif "sonnet" in lower_model:
+                            cost = (p_tok / 1_000_000 * 3.0) + (c_tok / 1_000_000 * 15.0)
+                        elif "haiku" in lower_model:
+                            cost = (p_tok / 1_000_000 * 0.25) + (c_tok / 1_000_000 * 1.25)
+                        if cost > 0.0:
+                            cost_msg = f" | 💸 {cost:.5f}$"
+                    elif "pro" in lower_model:
                         cost = (p_tok / 1_000_000 * 3.5) + (c_tok / 1_000_000 * 10.5)
                         cost_msg = f" | 💸 {cost:.5f}$"
                     elif "flash" in lower_model:
@@ -1843,6 +1866,12 @@ class LiveAgentWorker(QThread):
                 agent_config = AGENTS_CONFIG.get(current_agent_id, {})
                 name = agent_config.get("name", current_agent_id)
                 system_prompt = (self.extra_rules + "\n\n" if self.extra_rules else "") + agent_config.get("system_prompt", "")
+                
+                # Optimisation: Augmenter la capacité de lecture (read_file) de 50 à 500 lignes,
+                # sauf pour les modèles Gemma (qui risquent de se perdre avec trop de contexte)
+                if "gemma" not in model.lower():
+                    system_prompt = re.sub(r'("end":\s*)50\b', r'\g<1>500', system_prompt)
+
                 system_prompt = system_prompt.replace("Réponds UNIQUEMENT avec l'objet JSON, sans texte ni balises Markdown autour.", "")
                 system_prompt += "\n\nRÈGLE ABSOLUE : Tu dois IMPÉRATIVEMENT et UNIQUEMENT communiquer et rédiger tes explications en français (même si le code, les logs ou la documentation sont en anglais)."
                 system_prompt += "\n\nRÈGLE OBLIGATOIRE : Lorsque tu lis un fichier PDF et qu'il y a une capture d'écran associée, tu dois OBLIGATOIREMENT regarder l'image."

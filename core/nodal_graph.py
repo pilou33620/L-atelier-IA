@@ -559,7 +559,7 @@ class NodeGraphWidget(QGraphicsView):
             forces[node_id].setX(forces[node_id].x() - (node.x() - target_x) * 0.05)
             forces[node_id].setY(forces[node_id].y() - (node.y() - target_y) * 0.02)
                 
-        damping = 0.8
+        damping = 0.5 # Increased damping (lower value) to dissipate energy faster
         for node_id, node in self.nodes.items():
             if node.scene() and node.scene().mouseGrabberItem() == node:
                 continue
@@ -575,7 +575,7 @@ class NodeGraphWidget(QGraphicsView):
             fy *= damping
             
             # Augmentation du seuil d'arrêt pour éviter les micro-tremblements continus
-            if abs(fx) > 0.8 or abs(fy) > 0.8:
+            if abs(fx) > 1.5 or abs(fy) > 1.5:
                 node.setPos(node.x() + fx, node.y() + fy)
 
     def _recalc_layout(self):
