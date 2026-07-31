@@ -345,7 +345,7 @@ class NodeItem(QGraphicsObject):
         
         y_offset = -self.height/2 + 45
         
-        if not self.exchanged_files and not self.reports:
+        if not self.exchanged_files and not self.reports and not self.used_tools:
             painter.setPen(QPen(QColor(120, 130, 150)))
             if self.state == "success":
                 status_text = "Mission accomplie" if self.node_id == "orchestrator" else "Terminé"

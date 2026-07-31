@@ -1,6 +1,46 @@
 # ==========================================
 # VERSIONING DU CODE
-# Version : 4.4.0 (revue de code complète — crashs inter-modes, pipeline
+# Version : 4.4.1 (correction de la boucle « Réponse non-JSON » et
+#   durcissement de l'extraction d'action :
+#   BUG BLOQUANT —
+#   1. workers.extract_action : l'assainissement des antislashs
+#      (re.sub(r'\\(?![\\/bfnrtu"])', ...)) DÉTRUISAIT les chemins Windows
+#      CORRECTEMENT échappés par le LLM. re.sub avançant de façon non
+#      chevauchante, sur "C:\\Users" la position 0 était ignorée (lookahead
+#      = '\\') puis le scan reprenait sur le SECOND antislash, dont le
+#      suivant ('U') n'est pas échappable : il était doublé -> "C:\\\Users"
+#      -> JSONDecodeError « Invalid \escape ». Tout run PAIR d'antislashs
+#      suivi d'un caractère non échappable était cassé. Le message d'erreur
+#      renvoyé au modèle lui conseillait alors de DOUBLER ses antislashs —
+#      ce qu'il faisait déjà — d'où une boucle infinie « Réponse non-JSON,
+#      on redemande... » sur toute racine du type C:\Users\<nom>\Documents.
+#      Désormais : parsing du texte BRUT en premier, réparation seulement en
+#      second recours, par RUNS et IDEMPOTENTE (_pair_orphan_backslashes) ;
+#   2. workers : le message d'erreur et le prompt système orientent vers les
+#      SLASHES AVANT ou un chemin RELATIF (tous deux acceptés par
+#      _safe_path), ce qui supprime la classe de bugs à la source ;
+#   ROBUSTESSE —
+#   3. workers._find_balanced_end : le comptage d'accolades ignore désormais
+#      les accolades situées DANS une chaîne JSON (un champ 'content'
+#      contenant du code cassait la borne de fin du bloc) ;
+#   4. workers : les blocs ```json sont bornés par comptage d'accolades et
+#      non par le ``` fermant (survit à un ``` imbriqué dans le contenu) ;
+#   5. workers : la réponse brute est JOURNALISÉE en cas d'échec de parsing
+#      (le débogage était totalement aveugle) ; une réponse VIDE ou un objet
+#      JSON NON TERMINÉ sont diagnostiqués comme des TRONCATURES et non
+#      comme un simple « pas de JSON » ;
+#   6. llm.py : max_tokens Claude passé de 8192 (codé en dur) à 32000,
+#      surchargeable par ANTHROPIC_MAX_TOKENS ; stop_reason est désormais
+#      lu après le stream et une troncature est signalée explicitement ;
+#   SÉCURITÉ —
+#   7. llm.py : le base_url Claude pointait INCONDITIONNELLEMENT vers une
+#      passerelle tierce (aiprimetech.io) alors que le changelog V4.3.0
+#      annonçait la suppression de ce routage. Il est maintenant matérialisé
+#      par une constante nommée, JOURNALISÉ à chaque initialisation (clé API,
+#      prompts et code source lu par les agents transitent par ce tiers) et
+#      surchargeable par ANTHROPIC_BASE_URL, dont la valeur "official" force
+#      l'API officielle d'Anthropic.)
+# Version précédente : 4.4.0 (revue de code complète — crashs inter-modes, pipeline
 #   Hardware et durcissement sécurité :
 #   BUGS CRITIQUES —
 #   1. ui.py : combo_generalist n'existe qu'en mode Assistant Général ;
@@ -137,7 +177,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    logger.info("[LOG - SYSTEM] Lancement de 'L'Atelier IA V4.4.0'")
+    logger.info("[LOG - SYSTEM] Lancement de 'L'Atelier IA V4.4.1'")
     app = QApplication(sys.argv)
     app.setStyleSheet(DARK_QSS)
 

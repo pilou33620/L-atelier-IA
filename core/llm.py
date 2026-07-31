@@ -23,15 +23,71 @@ def _normalize_lm_host(url):
     return host.rstrip("/") or None
 
 
+# --- Endpoint Anthropic / passerelle compatible -----------------------------
+# ATTENTION (V4.4.1) : cette valeur n'est PAS l'API officielle d'Anthropic.
+# C'est une passerelle tierce (OneProvider), nécessaire pour les identifiants
+# de modèles au format "claude-...[1m]" utilisés par utils.AVAILABLE_MODELS.
+# Conséquence à assumer explicitement : la clé API, les prompts système et
+# TOUT le code source lu par les agents transitent par ce tiers.
+#
+# Le changelog V4.3.0 annonçait la suppression de ce routage ; il était en
+# réalité toujours actif et INCONDITIONNEL. Il est désormais :
+#   - matérialisé par une constante nommée (plus de littéral perdu au milieu
+#     d'une fonction) ;
+#   - journalisé à chaque initialisation (l'utilisateur voit où part sa clé) ;
+#   - surchargeable par la variable d'environnement ANTHROPIC_BASE_URL, dont
+#     la valeur spéciale "official" force l'API officielle d'Anthropic
+#     (à combiner avec des IDs de modèles officiels, donc sans le suffixe
+#     "[1m]", sinon l'API renvoie une erreur 404 modèle inconnu).
+DEFAULT_ANTHROPIC_BASE_URL = "https://aiprimetech.io"
+OFFICIAL_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+
+
+def _env_int(name, default, minimum, maximum):
+    """Entier lu dans l'environnement, borné, sans jamais lever d'exception."""
+    try:
+        value = int(str(os.environ.get(name, "")).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, value))
+
+
+# Budget de tokens en SORTIE pour Claude. 8192 (ancienne valeur codée en dur)
+# était insuffisant dès qu'un agent écrivait un fichier complet dans son
+# action JSON : la réponse était coupée en plein JSON et remontait comme
+# « Réponse non-JSON ». Surchargeable par ANTHROPIC_MAX_TOKENS.
+ANTHROPIC_MAX_TOKENS = _env_int("ANTHROPIC_MAX_TOKENS", 32_000, 1_024, 200_000)
+
+
+def _resolve_anthropic_base_url():
+    """URL de base effective pour les appels Claude (+ journalisation)."""
+    override = (os.environ.get("ANTHROPIC_BASE_URL") or "").strip()
+    if override.lower() in ("official", "anthropic"):
+        logger.info("Endpoint Claude : API OFFICIELLE Anthropic (%s) "
+                    "[ANTHROPIC_BASE_URL=official]", OFFICIAL_ANTHROPIC_BASE_URL)
+        return OFFICIAL_ANTHROPIC_BASE_URL
+    if override:
+        logger.warning("Endpoint Claude : passerelle PERSONNALISÉE %s "
+                       "(via ANTHROPIC_BASE_URL). Clé API, prompts et code "
+                       "source transitent par ce tiers.", override)
+        return override
+    logger.warning("Endpoint Claude : passerelle TIERCE %s (OneProvider). "
+                   "Clé API, prompts et code source lu par les agents "
+                   "transitent par ce tiers. Utilisez "
+                   "ANTHROPIC_BASE_URL=official pour l'API Anthropic "
+                   "officielle.", DEFAULT_ANTHROPIC_BASE_URL)
+    return DEFAULT_ANTHROPIC_BASE_URL
+
+
 def _init_anthropic_client(api_key):
-    """Initialise le client pour OneProvider (compatible Anthropic)."""
+    """Initialise le client Claude (API Anthropic ou passerelle compatible)."""
     from anthropic import Anthropic
 
     key = (api_key or "").strip()
     if not key:
         return None
 
-    return Anthropic(api_key=key, base_url="https://aiprimetech.io")
+    return Anthropic(api_key=key, base_url=_resolve_anthropic_base_url())
 
 
 def _is_quota_error(message):
@@ -87,6 +143,91 @@ def _cancellable_sleep(seconds, is_cancelled_callback=None):
             return True
         time.sleep(min(0.2, max(0.0, deadline - time.time())))
     return bool(is_cancelled_callback and is_cancelled_callback())
+
+
+def _describe_content_blocks(final_message, max_chars=600):
+    """Décrit les blocs de contenu d'une réponse Anthropic, pour le journal.
+
+    V4.4.2 : sans cette trace, un `text_stream` vide est INDIAGNOSTICABLE —
+    impossible de savoir si la passerelle a injecté un outil, lequel, et ce
+    que le modèle a mis dedans. C'est la seule information qui permet de
+    confirmer (ou d'infirmer) l'hypothèse de l'injection d'outils.
+
+    Les valeurs sont TRONQUÉES : le champ `input` d'un tool_use peut
+    contenir un fichier source entier. Cette fonction ne lève jamais
+    d'exception — un diagnostic ne doit pas casser la mission.
+    """
+    import json as _json
+    try:
+        if final_message is None:
+            return "  (message final indisponible : get_final_message() a échoué)"
+        blocks = getattr(final_message, "content", None)
+        if not blocks:
+            return "  (aucun bloc de contenu)"
+        lines = []
+        for i, block in enumerate(blocks):
+            btype = getattr(block, "type", "?")
+            detail = ""
+            if btype == "tool_use":
+                try:
+                    payload = _json.dumps(getattr(block, "input", None),
+                                          ensure_ascii=False)
+                except Exception:
+                    payload = repr(getattr(block, "input", None))
+                if len(payload) > max_chars:
+                    payload = (payload[:max_chars]
+                               + f"... [+{len(payload) - max_chars} car. tronqués]")
+                detail = f" name={getattr(block, 'name', '?')!r} input={payload}"
+            elif btype == "text":
+                txt = getattr(block, "text", "") or ""
+                detail = f" ({len(txt)} car.) {txt[:200]!r}"
+            elif btype in ("thinking", "redacted_thinking"):
+                th = getattr(block, "thinking", "") or ""
+                detail = f" ({len(th)} car. de raisonnement, non exploitable)"
+            lines.append(f"  [{i}] type={btype}{detail}")
+        return "\n".join(lines)
+    except Exception as e:  # jamais fatal : c'est du diagnostic
+        return f"  (description des blocs impossible : {e})"
+
+
+def _salvage_non_text_blocks(final_message):
+    """Récupère une action JSON logée dans un bloc de contenu NON-TEXTE.
+
+    BUGFIX (V4.4.2) — cause racine des boucles « Réponse non-JSON » :
+    le SDK Anthropic n'émet dans `text_stream` que les blocs de type
+    "text". Quand le modèle répond par un bloc `tool_use` (stop_reason
+    = "tool_use"), le flux de texte est donc VIDE et workers.py reçoit
+    une chaîne de 0 caractère, indiscernable d'une réponse hors format.
+
+    Or cette branche n'envoie AUCUN paramètre `tools` : l'API officielle
+    d'Anthropic ne peut pas renvoyer "tool_use" dans ces conditions.
+    C'est la passerelle tierce (voir DEFAULT_ANTHROPIC_BASE_URL) qui
+    injecte ses propres outils dans la requête. On ne peut pas l'en
+    empêcher côté client, mais on peut récupérer l'action au lieu de la
+    perdre : `block.input` contient le JSON que l'agent voulait émettre.
+
+    Renvoie une chaîne JSON exploitable par workers.extract_action, ou ""
+    si rien n'est récupérable.
+    """
+    import json as _json
+
+    blocks = getattr(final_message, "content", None) or []
+    for block in blocks:
+        if getattr(block, "type", None) != "tool_use":
+            continue  # les blocs "thinking" / "redacted_thinking" sont ignorés
+        payload = getattr(block, "input", None)
+        if not isinstance(payload, dict):
+            continue
+        # Cas direct : l'outil de la passerelle a reçu notre action telle quelle.
+        if "action" in payload:
+            return _json.dumps(payload, ensure_ascii=False)
+        # Cas enveloppé : l'action est nichée dans un argument de l'outil.
+        for value in payload.values():
+            if isinstance(value, dict) and "action" in value:
+                return _json.dumps(value, ensure_ascii=False)
+            if isinstance(value, str) and '"action"' in value:
+                return value
+    return ""
 
 
 def _estimate_tokens(text):
@@ -218,21 +359,19 @@ class GlobalRateLimiter:
             if cache_key not in cls._limiters:
                 name_lower = model_name.lower()
                 if "claude" in name_lower:
-                    # V4.4.0 : la branche Anthropic ne reposait QUE sur le
-                    # retry 429 — une mission multi-agents enchaînait les
-                    # backoffs. Limite prudente (Tier 1 Anthropic : 50 RPM) ;
-                    # pas de RPD local, Anthropic n'a pas de quota journalier
-                    # en requêtes.
-                    cls._limiters[cache_key] = RateLimiter(rpm=40, tpm=None, rpd=None)
+                    # Limite augmentée pour proxy aiprimetech.io (tests demandés par l'utilisateur)
+                    cls._limiters[cache_key] = RateLimiter(rpm=200, tpm=None, rpd=None)
                     return cls._limiters[cache_key]
                 if key_slot == 2:
-                    # Clé n°2 = forfait PAYANT (Tier 1) : limites bien plus
-                    # hautes. On reste volontairement en dessous des plafonds
-                    # officiels (~150 RPM / 2M TPM / 1000+ RPD sur Gemini Pro)
-                    # pour garder une marge de sécurité.
-                    rpm = 100
-                    tpm = 1_500_000
-                    rpd = 900
+                    # Clé n°2 = Limites Google AI Studio (Pay-as-you-go / Tier 1)
+                    # Basé sur les captures de l'utilisateur :
+                    # Gemini 3.1 Pro : 25 RPM / 2M TPM / 250 RPD
+                    # Gemini 3.6 Flash : 1000 RPM / 2M TPM / 10000 RPD
+                    rpm, tpm, rpd = 1000, 2_000_000, 10000
+                    if "pro" in name_lower:
+                        rpm, tpm, rpd = 25, 2_000_000, 250
+                    elif "flash" in name_lower:
+                        rpm, tpm, rpd = 1000, 2_000_000, 10000
                 else:
                     # Clé n°1 = forfait GRATUIT : limites prudentes.
                     # BUGFIX (V4.3.0) : l'ancien code appliquait les limites
@@ -521,10 +660,18 @@ class LLMProvider:
                 while True:
                     has_yielded = False
                     try:
-                        logger.info(f"Appel API OneProvider avec le modèle : {real_model_name}")
+                        logger.info(f"Appel API Claude avec le modèle : {real_model_name} "
+                                    f"(max_tokens={ANTHROPIC_MAX_TOKENS})")
                         with self.anthropic_client.messages.stream(
                             model=real_model_name,
-                            max_tokens=8192,
+                            # BUGFIX (V4.4.1) : 8192 tokens de sortie étaient
+                            # trop justes pour un agent qui écrit un fichier
+                            # entier dans son action JSON. La réponse était
+                            # coupée en plein milieu du JSON, et workers.py
+                            # ne pouvait pas distinguer une TRONCATURE d'une
+                            # réponse hors format : l'utilisateur voyait
+                            # « Réponse non-JSON, on redemande... » en boucle.
+                            max_tokens=ANTHROPIC_MAX_TOKENS,
                             system=system_prompt,
                             messages=anthropic_messages,
                             # V4.3.0 : force_json n'a pas d'équivalent côté
@@ -532,12 +679,107 @@ class LLMProvider:
                             # agents JSON (extract_action reste le filet).
                             temperature=0.2 if force_json else 0.7
                         ) as stream_ctx:
+                            # V4.4.2 : on conserve le texte émis pour pouvoir
+                            # vérifier s'il contient déjà une action avant de
+                            # tenter un rattrapage (sinon on risque de créer
+                            # une ambiguïté à DEUX actions côté workers.py).
+                            emitted_parts = []
                             for text in stream_ctx.text_stream:
                                 if is_cancelled_callback and is_cancelled_callback():
                                     return
                                 if text:
                                     yield "chunk", text
+                                    emitted_parts.append(text)
                                     has_yielded = True
+                            # V4.4.1 : diagnostic explicite de la troncature.
+                            # Sans ce contrôle, une réponse coupée à
+                            # max_tokens était indiscernable d'un simple
+                            # « pas de JSON » côté workers.py.
+                            try:
+                                final = stream_ctx.get_final_message()
+                                stop_reason = getattr(final, "stop_reason", None)
+                            except Exception:
+                                final = None
+                                stop_reason = None
+                            if stop_reason == "max_tokens":
+                                logger.warning(
+                                    "Réponse Claude TRONQUÉE (stop_reason=max_tokens, "
+                                    "limite=%d).", ANTHROPIC_MAX_TOKENS)
+                                yield "status", (
+                                    f"\n[✂️ Réponse TRONQUÉE : la limite de "
+                                    f"{ANTHROPIC_MAX_TOKENS} tokens de sortie a été "
+                                    f"atteinte. Le JSON de l'action est probablement "
+                                    f"incomplet — demandez à l'agent de découper son "
+                                    f"écriture en plusieurs actions, ou augmentez "
+                                    f"ANTHROPIC_MAX_TOKENS.]\n")
+                            elif stop_reason == "tool_use" or not has_yielded:
+                                # BUGFIX (V4.4.2) : deux symptômes, une seule
+                                # cause. Le SDK n'expose dans `text_stream`
+                                # que les blocs "text" ; une action logée dans
+                                # un bloc `tool_use` est donc PERDUE, que le
+                                # modèle ait produit un préambule textuel
+                                # (réponses de 86/138 car. observées en
+                                # mission) ou rien du tout.
+                                #
+                                # Cette branche ne devrait JAMAIS se déclencher
+                                # avec l'API officielle : aucun paramètre
+                                # `tools` n'est envoyé ci-dessus, et l'API
+                                # d'Anthropic ne peut pas renvoyer "tool_use"
+                                # sans outil déclaré. Si elle se déclenche,
+                                # c'est la passerelle qui injecte ses propres
+                                # outils — d'où la trace ci-dessous, qui est la
+                                # seule façon de le vérifier factuellement.
+                                emitted_text = "".join(emitted_parts)
+                                logger.warning(
+                                    "Claude : aucune action exploitable dans le TEXTE "
+                                    "(stop_reason=%s, %d car. de texte, endpoint=%s).\n"
+                                    "Blocs de contenu réellement reçus :\n%s",
+                                    stop_reason, len(emitted_text),
+                                    _resolve_anthropic_base_url(),
+                                    _describe_content_blocks(final))
+
+                                # Si le texte contient déjà une action, on ne
+                                # rattrape RIEN : deux actions concurrentes
+                                # seraient rejetées comme ambiguës.
+                                if '"action"' in emitted_text:
+                                    salvaged = ""
+                                else:
+                                    salvaged = _salvage_non_text_blocks(final)
+
+                                if salvaged:
+                                    logger.warning(
+                                        "Action récupérée dans un bloc tool_use "
+                                        "(%d car.).", len(salvaged))
+                                    yield "status", (
+                                        "\n[🔧 Le modèle a répondu via un OUTIL "
+                                        "injecté par la passerelle au lieu de texte "
+                                        "brut : action JSON récupérée. Pour supprimer "
+                                        "la cause, utilisez ANTHROPIC_BASE_URL=official "
+                                        "avec un ID de modèle officiel.]\n")
+                                    # Séparateur : le préambule textuel éventuel
+                                    # ne doit pas se coller au JSON récupéré.
+                                    if emitted_text and not emitted_text.endswith("\n"):
+                                        yield "chunk", "\n"
+                                    yield "chunk", salvaged
+                                    has_yielded = True
+                                elif '"action"' in emitted_text:
+                                    # Rien à faire : l'action est dans le texte,
+                                    # extract_action la trouvera.
+                                    pass
+                                elif has_yielded:
+                                    yield "status", (
+                                        f"\n[⚠️ Le modèle a produit du texte mais "
+                                        f"AUCUNE action exploitable "
+                                        f"(stop_reason={stop_reason}). Détail des blocs "
+                                        f"reçus dans le journal (niveau WARNING).]\n")
+                                else:
+                                    logger.warning(
+                                        "Réponse Claude VIDE (stop_reason=%s).",
+                                        stop_reason)
+                                    yield "status", (
+                                        f"\n[⚠️ Le modèle n'a renvoyé AUCUN texte "
+                                        f"(stop_reason={stop_reason}). Détail des blocs "
+                                        f"reçus dans le journal (niveau WARNING).]\n")
                         return
                     except Exception as e:
                         if has_yielded:

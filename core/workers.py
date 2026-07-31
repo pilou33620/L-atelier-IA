@@ -14,6 +14,149 @@ from core.llm import LLMProvider
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+#  Extraction / reparation du JSON d'action (V4.4.1)
+# =============================================================================
+#  BUG CORRIGE (V4.4.1) : l'assainissement historique des antislashs
+#      text = re.sub(r'\\(?![\\/bfnrtu"])', r'\\\\', text)
+#  DETRUISAIT les chemins Windows CORRECTEMENT echappes par le LLM. re.sub
+#  avance de facon non chevauchante : sur "C:\\Users", la position 0 est
+#  ignoree (lookahead = '\\'), puis le scan reprend sur le SECOND antislash,
+#  dont le suivant est 'U' -> il est double -> "C:\\\Users" -> JSONDecodeError
+#  « Invalid \escape ». Tout run PAIR d'antislashs suivi d'un caractere non
+#  echappable etait casse ; seuls les runs impairs survivaient.
+#  Le message d'erreur renvoye au modele lui conseillait alors de DOUBLER ses
+#  antislashs -- exactement ce qu'il faisait deja -- d'ou la boucle infinie
+#  « Reponse non-JSON, on redemande... » sur toute racine du type
+#  C:\Users\<nom>\Documents\...
+#
+#  Nouvelle approche :
+#   1. on tente d'abord le parsing du texte BRUT (aucune reecriture) ;
+#   2. la reparation n'est qu'un SECOND essai, par RUNS d'antislashs et
+#      IDEMPOTENTE (un run pair est deja appaire : on n'y touche pas) ;
+#   3. le comptage d'accolades IGNORE les accolades situees DANS une chaine
+#      JSON (un champ 'content' contenant du code cassait la borne de fin) ;
+#   4. les blocs markdown sont bornes par comptage d'accolades et non par le
+#      ``` fermant (survit a un ``` imbrique dans le contenu) ;
+#   5. la reponse brute est JOURNALISEE en cas d'echec (fin du debogage
+#      aveugle) et une reponse VIDE est diagnostiquee comme telle
+#      (troncature max_tokens cote API, cf. llm.py).
+# =============================================================================
+
+_VALID_JSON_ESC = set('"\\/bfnrtu')
+
+
+def _pair_orphan_backslashes(s):
+    """Complete UNIQUEMENT les antislashs orphelins. Idempotent.
+
+    - run de longueur PAIRE                          -> deja appaire, intact ;
+    - run IMPAIR suivi d'un echappement JSON valide  -> intact ;
+    - run IMPAIR sinon                               -> +1 antislash.
+    """
+    def repl(m):
+        run = m.group(0)
+        rest = s[m.end():]
+        if len(run) % 2 == 0:
+            return run
+        nxt = rest[:1]
+        if nxt == "u":
+            return run if re.match(r"u[0-9a-fA-F]{4}", rest) else run + "\\"
+        if nxt in _VALID_JSON_ESC:
+            return run
+        return run + "\\"
+
+    return re.sub(r"\\+", repl, s)
+
+
+def _strip_trailing_commas(s):
+    """Supprime les virgules de fin de liste/dict (frequent chez les LLM)."""
+    return re.sub(r",\s*([\]\}])", r"\1", s)
+
+
+def _find_balanced_end(text, start):
+    """Fin du bloc { ... } en IGNORANT les accolades dans les chaines JSON.
+
+    Renvoie l'index EXCLUSIF de la '}' fermante, ou -1 si le bloc n'est pas
+    clos (reponse tronquee).
+    """
+    depth = 0
+    in_str = False
+    escaped = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if in_str:
+            if escaped:
+                escaped = False
+            elif c == "\\":
+                escaped = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return -1
+
+
+def _collect_json_candidates(text):
+    """Tous les objets JSON de premier niveau presents dans `text`.
+
+    Renvoie (candidates, last_error) ou candidates est une liste de
+    (obj, origine), origine commencant par "markdown" ou "raw".
+    """
+    candidates = []
+    last_error = None
+
+    def _try(blob, origin):
+        nonlocal last_error
+        for variant in (blob, _strip_trailing_commas(blob)):
+            try:
+                candidates.append((json.loads(variant, strict=False), origin))
+                return True
+            except json.JSONDecodeError as e:
+                last_error = str(e)
+        # Dernier recours : litteral Python (guillemets simples, True/None...)
+        try:
+            import ast
+            obj = ast.literal_eval(_strip_trailing_commas(blob))
+            if isinstance(obj, dict):
+                candidates.append((obj, origin + "_ast"))
+                return True
+        except Exception:
+            pass
+        return False
+
+    # 1) Blocs markdown ```json ... ``` (bornes par comptage d'accolades).
+    for m in re.finditer(r"```(?:json|JSON)?[ \t]*\r?\n?\s*(?=\{)", text):
+        start = text.find("{", m.end() - 1)
+        if start == -1:
+            continue
+        end = _find_balanced_end(text, start)
+        if end != -1:
+            _try(text[start:end], "markdown")
+
+    # 2) Balayage brut de tout le texte.
+    idx = 0
+    while True:
+        start = text.find("{", idx)
+        if start == -1:
+            break
+        end = _find_balanced_end(text, start)
+        if end == -1:
+            break
+        if _try(text[start:end], "raw"):
+            idx = end
+        else:
+            idx = start + 1
+
+    return candidates, last_error
+
+
 class TestKeyWorker(QThread):
     result_signal = pyqtSignal(bool, str)
 
@@ -184,6 +327,15 @@ class LiveAgentWorker(QThread):
         return None
 
     MAX_STEPS = 25
+    # BUGFIX (V4.4.2) : plafond de relances consécutives sur une réponse
+    # inexploitable (« Réponse non-JSON, on redemande... »). L'ancienne
+    # boucle était INFINIE dans les faits : chaque échec ajoutait 2 messages
+    # à l'historique et brûlait une étape, sans jamais changer de stratégie.
+    # Résultat observé en mission : 6 relances d'affilée sur l'Orchestrateur,
+    # 7 sur l'Analyste, 45 s à 100 s par appel, limite d'étapes atteinte et
+    # zéro rapport produit. Au-delà de ce plafond on abandonne le tour de
+    # l'agent au lieu de le laisser dériver.
+    MAX_PARSE_FAILURES = 3
     # Garde-fou anti-suppression en masse : nombre maximal de fichiers
     # qu'une même mission peut supprimer (delete_file). Au-delà, refus sec —
     # même avec l'accord de l'utilisateur clic par clic, une rafale de
@@ -751,78 +903,119 @@ class LiveAgentWorker(QThread):
 
     @staticmethod
     def extract_action(text):
-        """Extrait l'action JSON de la réponse du modèle.
+        """Extrait l'action JSON de la reponse du modele.
 
-        SÉCURITÉ (anti « action cachée ») : l'ancienne version prenait
-        silencieusement le PREMIER objet JSON rencontré. Un modèle qui déraille
-        — ou une injection de prompt logée dans un fichier du projet — pouvait
-        donc glisser une seconde action à côté de la première. Ici on collecte
-        TOUS les objets JSON porteurs d'une clé "action" (dans les blocs
-        markdown ET dans le texte brut), on les dédoublonne, et si DEUX actions
-        distinctes coexistent on refuse l'ambiguïté au lieu d'en choisir une.
+        SECURITE (anti « action cachee ») : on collecte TOUS les objets JSON
+        porteurs d'une cle "action" (blocs markdown ET texte brut), on les
+        dedoublonne, et si DEUX actions distinctes coexistent on refuse
+        l'ambiguite au lieu d'en choisir une.
+
+        ROBUSTESSE (V4.4.1) : le texte BRUT est essaye EN PREMIER ; la
+        reparation des antislashs orphelins n'intervient qu'en second recours
+        et est idempotente (voir _pair_orphan_backslashes). L'ancienne
+        reecriture systematique cassait les chemins Windows deja echappes.
 
         Renvoie (obj|None, status) avec status dans :
-          "success_markdown" | "fallback_raw" | "ambiguous" | "error" | "error: <detail>".
+          "success_markdown" | "fallback_raw" | "ambiguous"
+          | "error" | "error: <detail>".
         """
-        # --- ASSAINISSEMENT JSON ---
-        # Remplace les antislashs non échappés (fréquents dans les chemins Windows) 
-        # par des doubles antislashs, en préservant les échappements JSON valides.
-        text = re.sub(r'\\(?![\\/bfnrtu"])', r'\\\\', text)
+        raw = text or ""
 
-        candidates = []  # liste de (obj, origine) où origine ∈ {"markdown","raw"}
-        last_error = None
+        # Essai 1 : texte BRUT, aucune reecriture (cas normal).
+        candidates, last_error = _collect_json_candidates(raw)
+        actions = [(o, org) for (o, org) in candidates
+                   if isinstance(o, dict) and "action" in o]
 
-        for m in re.finditer(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL):
-            try:
-                candidates.append((json.loads(m.group(1), strict=False), "markdown"))
-            except json.JSONDecodeError as e:
-                last_error = str(e)
-
-        # 2) Balayage brut : tous les objets JSON de premier niveau du texte.
-        #    raw_decode avance après chaque objet décodé, donc les objets
-        #    imbriqués (args, etc.) ne sont pas comptés séparément.
-        decoder = json.JSONDecoder(strict=False)
-        idx = 0
-        while True:
-            start = text.find('{', idx)
-            if start == -1:
-                break
-            try:
-                obj, offset = decoder.raw_decode(text[start:])
-                candidates.append((obj, "raw"))
-                idx = start + offset
-            except json.JSONDecodeError as e:
-                if not last_error:
-                    last_error = str(e)
-                idx = start + 1
-
-        # On ne retient que les objets porteurs d'une clé "action".
-        actions = [(obj, origin) for (obj, origin) in candidates
-                   if isinstance(obj, dict) and "action" in obj]
+        # Essai 2 : antislashs orphelins appaires (LLM paresseux sur un chemin
+        # Windows non echappe). Idempotent : ne casse jamais un JSON deja bon.
         if not actions:
+            repaired = _pair_orphan_backslashes(raw)
+            if repaired != raw:
+                candidates2, err2 = _collect_json_candidates(repaired)
+                actions2 = [(o, org) for (o, org) in candidates2
+                            if isinstance(o, dict) and "action" in o]
+                if actions2:
+                    candidates, actions = candidates2, actions2
+                elif not last_error:
+                    last_error = err2
+
+        if not actions:
+            # Sans cette trace, le diagnostic est impossible cote utilisateur.
+            logger.warning(
+                "extract_action : aucune action JSON exploitable. "
+                "Erreur=%s | Reponse brute (%d car.) : %r",
+                last_error, len(raw), raw[:2000])
+            if not raw.strip():
+                return None, ("error: reponse VIDE du modele. Cause probable : "
+                              "budget de sortie epuise (max_tokens) ou reponse "
+                              "tronquee cote API.")
+            if raw.count("{") > raw.count("}"):
+                return None, ("error: objet JSON NON TERMINE (accolade fermante "
+                              "manquante). La reponse a probablement ete tronquee "
+                              "(max_tokens) : sois beaucoup plus concis.")
             if last_error:
                 return None, f"error: {last_error}"
             if candidates:
-                return None, "error: JSON valide trouvé mais la clé 'action' est manquante. Format attendu : {\"action\": \"nom_de_l_action\", \"args\": {...}}"
+                return None, ("error: JSON valide trouve mais la cle 'action' est "
+                              "manquante. Format attendu : "
+                              '{"action": "nom_de_l_action", "args": {...}}')
             return None, "error"
 
-        # Dédoublonnage : un même objet peut apparaître via markdown ET via le
-        # balayage brut (le bloc markdown est aussi du texte). On compare sur
-        # une forme canonique et on conserve l'origine markdown si présente.
+        # Dedoublonnage sur forme canonique (markdown ajoute avant -> prioritaire)
         seen = {}
         for obj, origin in actions:
             key = json.dumps(obj, sort_keys=True, ensure_ascii=False)
             if key not in seen:
-                seen[key] = origin  # markdown ajouté en premier -> prioritaire
+                seen[key] = origin
 
         if len(seen) > 1:
-            # Plusieurs actions RÉELLEMENT différentes : on refuse.
+            # Plusieurs actions REELLEMENT differentes : on refuse.
             return None, "ambiguous"
 
         only_key = next(iter(seen))
         obj = json.loads(only_key, strict=False)
-        status = "success_markdown" if seen[only_key] == "markdown" else "fallback_raw"
+        status = "success_markdown" if "markdown" in seen[only_key] else "fallback_raw"
         return obj, status
+
+    def _abandon_agent_turn(self, agent_id, agent_name, failures, detail):
+        """Abandonne le tour d'un agent qui n'émet plus d'action exploitable.
+
+        V4.4.2. Renvoie True si la MISSION ENTIÈRE doit s'arrêter (cas de
+        l'Orchestrateur : lui repasser la main à lui-même reproduirait la
+        boucle qu'on cherche justement à casser), False s'il suffit de rendre
+        la main à l'Orchestrateur. Le motif est déposé dans
+        self._last_abandon_reason pour servir de contexte au tour suivant.
+        """
+        reason = (
+            f"ERREUR : l'agent {agent_name} n'a produit aucune action JSON "
+            f"exploitable après {failures} tentatives consécutives "
+            f"(diagnostic : {detail}). Son tour a été abandonné. "
+            f"Ne le redéclenche pas à l'identique : soit tu traites la tâche "
+            f"toi-même, soit tu la confies à un autre agent, soit tu conclus "
+            f"avec les éléments déjà rassemblés."
+        )
+        self._last_abandon_reason = reason
+        self.agent_state_changed.emit(agent_id, "error")
+        ts = datetime.now().strftime("%H:%M:%S")
+
+        if agent_id == "orchestrator":
+            self.status_update.emit(
+                f"[{ts}] 🛑 L'Orchestrateur n'émet plus d'action JSON valide "
+                f"après {failures} tentatives : mission interrompue.\n"
+                f"   Piste la plus probable : le modèle répond via un bloc "
+                f"'tool_use' injecté par la passerelle API. Essayez "
+                f"ANTHROPIC_BASE_URL=official, ou un autre modèle.\n")
+            self.finished_mission.emit(
+                False,
+                f"Mission interrompue : l'Orchestrateur n'a pas produit "
+                f"d'action JSON valide après {failures} tentatives "
+                f"({detail}).")
+            return True
+
+        self.status_update.emit(
+            f"[{ts}] 🛑 {agent_name} abandonné après {failures} réponses "
+            f"inexploitables. Retour à l'Orchestrateur.\n")
+        return False
 
     def execute_tool(self, action, current_agent_id):
         name = action.get("action")
@@ -1668,8 +1861,14 @@ class LiveAgentWorker(QThread):
                                   "Si tu dois réfléchir, ajoute une clé 'thought' DANS ton objet JSON. "
                                   "L'action JSON doit contenir la clé 'action' et peut être encadrée par des balises markdown ```json. "
                                   "Tu ne dois fournir qu'UNE SEULE action JSON par réponse.\n"
-                                  "⚠️ IMPORTANT : Utilise TOUJOURS des guillemets doubles (\") et JAMAIS de guillemets simples ('). "
-                                  "Pour les chemins Windows, n'oublie jamais de doubler les antislashs (ex: C:\\\\dossier\\\\fichier).")
+                                  "⚠️ IMPORTANT : Utilise TOUJOURS des guillemets doubles et JAMAIS de guillemets simples. "
+                                  # V4.4.1 : on privilegie les slashes avant pour les chemins.
+                                  # _safe_path (sandbox.py) les accepte sous Windows, et cela
+                                  # supprime toute la classe de bugs d'echappement JSON.
+                                  "Pour les chemins, utilise de preference des SLASHES AVANT "
+                                  "(ex: C:/dossier/fichier.py) ou un chemin RELATIF a la racine "
+                                  "du projet (ex: core/sandbox.py) : les deux sont acceptes et "
+                                  "evitent tout probleme d'echappement.")
                 self.status_update.emit(f"\n=========================================\n 🔄 Passation à : {name} ({model})\n=========================================\n")
                 self.agent_changed.emit(current_agent_id)
 
@@ -1683,6 +1882,9 @@ class LiveAgentWorker(QThread):
                 agent_finished = False
                 agent_step = 0
                 just_switched = True
+                # V4.4.2 : relances consécutives sur réponse inexploitable.
+                # Remis à zéro dès qu'une action valide est extraite.
+                parse_failures = 0
                 
                 while not agent_finished:
                     if getattr(self, '_is_cancelled', False):
@@ -1781,30 +1983,92 @@ class LiveAgentWorker(QThread):
                     end_t = time.time()
                     self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] ⏱️ Temps de réponse : {end_t - start_t:.2f}s\n")
                     
-                    self._append_to_history(current_agent_id, {"role": "assistant", "content": response})
+                    # BUGFIX (V4.4.2) : une réponse vide était réinjectée telle
+                    # quelle dans l'historique, ce qui produit un bloc
+                    # {"type": "text", "text": ""} côté API Anthropic — refusé
+                    # en HTTP 400 par l'API officielle (la passerelle tierce le
+                    # tolérait, masquant le défaut). On n'ajoute donc le tour
+                    # 'assistant' que s'il a un contenu réel ; le message
+                    # d'erreur qui suit sera fusionné avec le tour user
+                    # précédent par llm.py, ce qui reste un dialogue valide.
+                    if (response or "").strip():
+                        self._append_to_history(
+                            current_agent_id,
+                            {"role": "assistant", "content": response})
                     action, parse_status = self.extract_action(response)
                     if parse_status == "error" or (isinstance(parse_status, str) and parse_status.startswith("error:")):
                         self.agent_state_changed.emit(current_agent_id, "error")
 
                     if parse_status == "ambiguous":
+                        parse_failures += 1
+                        if parse_failures >= self.MAX_PARSE_FAILURES:
+                            if self._abandon_agent_turn(
+                                    current_agent_id, name, parse_failures,
+                                    "plusieurs actions JSON concurrentes"):
+                                return
+                            mission_context = self._last_abandon_reason
+                            current_agent_id = "orchestrator"
+                            agent_finished = True
+                            break
                         self._append_to_history(current_agent_id, {"role": "user", "content": (
                             "ERREUR : ta réponse contient PLUSIEURS actions JSON distinctes. "
                             "Tu ne dois émettre QU\'UNE SEULE action par message. "
                             "Renvoie uniquement l\'unique objet JSON de l\'action à exécuter, "
                             "sans aucun autre objet JSON autour.")})
-                        self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] 🛑 Réponse ambiguë (plusieurs actions), on redemande...\n")
+                        self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] 🛑 Réponse ambiguë (plusieurs actions), on redemande... (tentative {parse_failures}/{self.MAX_PARSE_FAILURES})\n")
                         continue
 
                     if action is None:
+                        parse_failures += 1
+                        # V4.4.2 : au-delà du plafond, on arrête de redemander
+                        # la même chose — c'est ce qui faisait boucler l'agent.
+                        if parse_failures >= self.MAX_PARSE_FAILURES:
+                            detail = parse_status[7:] if (
+                                isinstance(parse_status, str)
+                                and parse_status.startswith("error: ")) else "format inexploitable"
+                            if self._abandon_agent_turn(
+                                    current_agent_id, name, parse_failures, detail):
+                                return
+                            mission_context = self._last_abandon_reason
+                            current_agent_id = "orchestrator"
+                            agent_finished = True
+                            break
                         err_msg = "ERREUR: Aucun objet JSON d'action valide trouvé dans ta réponse."
                         if isinstance(parse_status, str) and parse_status.startswith("error: "):
                             err_msg += f"\n\nDétail de l'erreur JSON : {parse_status[7:]}\n\n⚠️ CONSEIL: Si tu inclus du texte avec des guillemets doubles (\") ou des retours à la ligne dans ton JSON, tu DOIS impérativement les échapper (\\\" ou \\n)."
-                            err_msg += "\n⚠️ RAPPEL: Assure-toi d'utiliser des guillemets DOUBLES (\") et de doubler tes antislashs pour les chemins Windows (\\\\)."
+                            # V4.4.1 : l'ancien conseil (« double tes antislashs »)
+                            # entretenait la boucle -- c'est precisement l'assainisseur
+                            # qui cassait les chemins DEJA doubles. On oriente desormais
+                            # vers les slashes avant, acceptes par _safe_path.
+                            err_msg += ("\n⚠️ RAPPEL: chaque clé et chaque valeur texte "
+                                        "doit être entourée de guillemets DOUBLES. "
+                                        "Pour un chemin, préfère les SLASHES AVANT "
+                                        "(C:/dossier/fichier.py) ou un chemin RELATIF à la "
+                                        "racine du projet : toujours accepté, et cela évite "
+                                        "tout problème d'échappement.")
                             
+                        # V4.4.2 : à la DERNIÈRE tentative, on remplace les longs
+                        # conseils d'échappement (que le modèle a déjà ignorés
+                        # deux fois) par une consigne minimale et impérative.
+                        # Répéter le même rappel plus fort n'a jamais débloqué
+                        # la boucle en pratique.
+                        if parse_failures == self.MAX_PARSE_FAILURES - 1:
+                            err_msg = (
+                                "DERNIÈRE TENTATIVE. Réponds UNIQUEMENT par un objet "
+                                "JSON, sans aucun texte avant ni après, sans balise "
+                                "markdown, sans explication. Exemple exact du format "
+                                "attendu :\n"
+                                '{"action": "finish", "args": {"summary": "..."}}\n'
+                                "Si tu ne peux pas produire d'action utile, utilise "
+                                "l'action 'finish' en résumant ce que tu as appris.")
                         self._append_to_history(current_agent_id, {"role": "user", "content": err_msg})
-                        self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Réponse non-JSON, on redemande...\n")
+                        self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Réponse non-JSON, on redemande... (tentative {parse_failures}/{self.MAX_PARSE_FAILURES})\n")
                         continue
                         
+                    # V4.4.2 : action exploitable -> le compteur de relances
+                    # repart de zéro (le plafond vise les échecs CONSÉCUTIFS).
+                    parse_failures = 0
+
                     if parse_status == "fallback_raw":
                         self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] ℹ️ Action extraite via fallback (hors bloc markdown).\n")
 
