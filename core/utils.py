@@ -217,6 +217,8 @@ def _shift_indent(text, shift):
             k = 0
             while k < -shift and k < len(line) and line[k] in " \t":
                 k += 1
+            if k < -shift:
+                return None
             out.append(line[k:])
     return "\n".join(out)
 
@@ -253,7 +255,7 @@ def flexible_search(original, search, replace):
     #    produisait des fins de ligne mixtes (perte du '\r' terminal).
     search_lines = search.split("\n")
     line_patterns = [re.escape(l.rstrip()) + r"[ \t]*" for l in search_lines]
-    pattern = "(?:^|(?<=\n))" + r"\r?\n".join(line_patterns)
+    pattern = "(?:^|(?<=\n))" + r"\r?\n".join(line_patterns) + r"(?=\r?\n|\Z)"
     try:
         matches = list(re.finditer(pattern, original))
     except re.error:
@@ -269,8 +271,15 @@ def flexible_search(original, search, replace):
     o_lines = original.split("\n")
     s_lines = search_lines
     m = len(s_lines)
+
+    _indent_of = lambda l: l[:len(l) - len(l.lstrip())]
+    if any("\t" in _indent_of(l) for l in s_lines):
+        return not_found
+
     found = []
     for i in range(len(o_lines) - m + 1):
+        if any("\t" in _indent_of(l) for l in o_lines[i:i+m]):
+            continue
         shift = None
         ok = True
         for j in range(m):
@@ -294,15 +303,19 @@ def flexible_search(original, search, replace):
         i, shift = found[0]
         start = sum(len(l) + 1 for l in o_lines[:i])
         end = start + sum(len(o_lines[i + j]) + 1 for j in range(m)) - 1
+        
+        shifted_replace = _shift_indent(replace, shift)
+        if shifted_replace is None:
+            return not_found
+
         # BUGFIX (V4.3.0) : sur un fichier CRLF, les lignes issues de
         # split("\n") se terminent par '\r' ; sans ce correctif, le '\r'
         # final du bloc était consommé par le remplacement (fins de ligne
         # mixtes dans le fichier résultant).
-        if o_lines[i + m - 1].endswith("\r"):
+        if original[end-1:end] == '\r':
             end -= 1
         return {"found": True, "mode": "indent", "occurrences": len(found),
-                "start": start, "end": end,
-                "replace": _shift_indent(replace, shift)}
+                "start": start, "end": end, "replace": shifted_replace}
 
     return not_found
 

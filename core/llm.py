@@ -554,7 +554,7 @@ class LLMProvider:
             # appliqué qu'à la branche Google/Anthropic — une longue mission
             # locale finissait en erreur côté serveur LM Studio.
             messages, removed_count, ctx_limit = _fit_to_context(
-                system_prompt, messages, model_name)
+                system_prompt, messages, model_name, output_reserve=8192)
             if removed_count:
                 yield "status", (f"\n[🧹 Contexte presque plein ({ctx_limit:,} tokens max "
                                  f"pour ce modèle) : {removed_count} ancien(s) message(s) "
@@ -589,11 +589,11 @@ class LLMProvider:
             is_gemma = is_gemma_model(real_model_name)
 
             # Garde-fou fenêtre de contexte : appliqué AVANT le branchement
-            # par provider, donc valable aussi pour Claude (200K tokens :
+            # par provider, donc valable aussi pour Claude (1M tokens :
             # BUGFIX, l'ancienne version ne l'appliquait qu'aux modèles
             # Google, et une longue mission sur Claude finissait en 400).
             messages, removed_count, ctx_limit = _fit_to_context(
-                system_prompt, messages, real_model_name)
+                system_prompt, messages, real_model_name, output_reserve=ANTHROPIC_MAX_TOKENS)
             if removed_count:
                 yield "status", (f"\n[🧹 Contexte presque plein ({ctx_limit:,} tokens max "
                                  f"pour ce modèle) : {removed_count} ancien(s) message(s) "
