@@ -1256,6 +1256,7 @@ class LiveAgentWorker(QThread):
                         f"simplement : \"Rapport publié dans {rel_path}\".")
 
             if name in ["edit_file", "write_file", "delete_file", "rename_file", "regex_replace", "linter_autofix"]:
+                self.status_update.emit(f"🛠️  L'agent modifie les fichiers avec l'outil {name}...\n")
                 # Sécurité : lecture seule pour certains agents.
                 # Plus AUCUNE exception : les rapports passent exclusivement
                 # par publish_report (le système choisit le fichier), les
@@ -1274,66 +1275,64 @@ class LiveAgentWorker(QThread):
                     original_raw = self.sandbox.read_file(path, truncate=False)
                     has_crlf = '\r\n' in original_raw
                     
-                    search = args["search"]
-                    replace_str = args.get("replace", "")
+                    # Compatibilité ascendante : gère soit une liste 'replacements', soit 'search'/'replace' direct
+                    replacements = args.get("replacements")
+                    if not replacements:
+                        if "search" in args:
+                            replacements = [{"search": args["search"], "replace": args.get("replace", "")}]
+                        else:
+                            return "ÉCHEC : l'argument 'replacements' ou 'search' est manquant."
+
+                    new_text = original_raw
+                    fuzzy_notes = []
                     
-                    if has_crlf:
-                        # Convert to CRLF if needed
-                        search = search.replace('\r\n', '\n').replace('\n', '\r\n')
-                        replace_str = replace_str.replace('\r\n', '\n').replace('\n', '\r\n')
-                    else:
-                        search = search.replace('\r\n', '\n')
-                        replace_str = replace_str.replace('\r\n', '\n')
+                    # On traite les remplacements dans l'ordre (du dernier au premier pour ne pas décaler les index)
+                    # Mais pour ça il faut d'abord trouver toutes les correspondances
+                    matches = []
+                    for i, rep in enumerate(replacements):
+                        search = rep.get("search", "")
+                        replace_str = rep.get("replace", "")
+                        
+                        if has_crlf:
+                            search = search.replace('\r\n', '\n').replace('\n', '\r\n')
+                            replace_str = replace_str.replace('\r\n', '\n').replace('\n', '\r\n')
+                        else:
+                            search = search.replace('\r\n', '\n')
+                            replace_str = replace_str.replace('\r\n', '\n')
 
-                    # Localisation du bloc : matching EXACT d'abord, puis
-                    # fallbacks tolérants (espaces de fin de ligne, décalage
-                    # d'indentation uniforme). Cela élimine la majorité des
-                    # échecs "le bloc search est introuvable" observés en
-                    # mission, sans sacrifier l'exigence d'unicité.
-                    match = flexible_search(original_raw, search, replace_str)
+                        match = flexible_search(new_text, search, replace_str)
 
-                    if not match["found"]:
-                        search_lines = [l for l in search.splitlines() if l.strip()]
-                        closest_msg = ""
-                        if search_lines:
-                            closest = difflib.get_close_matches(search_lines[0], original_raw.splitlines(), n=3, cutoff=0.5)
-                            if closest:
-                                closest_msg = "\n\nLignes proches trouvées dans le fichier :\n" + "\n".join([f"- {m}" for m in closest])
-                        return (f"ÉCHEC : le bloc 'search' est introuvable tel quel "
-                                f"dans le fichier (même avec tolérance aux espaces et à "
-                                f"l'indentation). Relis le fichier et recopie le texte "
-                                f"EXACT (sans numéros de ligne).{closest_msg}")
+                        if not match["found"]:
+                            search_lines = [l for l in search.splitlines() if l.strip()]
+                            closest_msg = ""
+                            if search_lines:
+                                closest = difflib.get_close_matches(search_lines[0], original_raw.splitlines(), n=3, cutoff=0.5)
+                                if closest:
+                                    closest_msg = "\n\nLignes proches trouvées dans le fichier :\n" + "\n".join([f"- {m}" for m in closest])
+                            return (f"ÉCHEC (Batch annulé) : le bloc 'search' n°{i+1} est introuvable tel quel "
+                                    f"dans le fichier. Relis le fichier et recopie le texte "
+                                    f"EXACT (sans numéros de ligne).{closest_msg}")
 
-                    # Sécurité : si le bloc 'search' apparaît plusieurs fois,
-                    # l'ancien comportement remplaçait silencieusement la
-                    # PREMIÈRE occurrence — potentiellement la mauvaise. On
-                    # exige un bloc unique, quel que soit le mode de matching.
-                    occurrences = match["occurrences"]
-                    if occurrences > 1:
-                        return (f"ÉCHEC : le bloc 'search' apparaît {occurrences} fois dans "
-                                f"{path} (mode de correspondance : {match['mode']}). "
-                                f"Impossible de savoir laquelle modifier. "
-                                f"Ajoute des lignes de contexte AVANT et/ou APRÈS pour "
-                                f"rendre le bloc unique, puis refais ton edit_file.")
+                        occurrences = match["occurrences"]
+                        if occurrences > 1:
+                            return (f"ÉCHEC (Batch annulé) : le bloc 'search' n°{i+1} apparaît {occurrences} fois dans "
+                                    f"{path}. Impossible de savoir laquelle modifier. "
+                                    f"Ajoute des lignes de contexte AVANT et/ou APRÈS pour "
+                                    f"rendre le bloc unique, puis refais ton edit_file.")
+
+                        if match["mode"] == "trailing_ws":
+                            fuzzy_notes.append(f"Bloc {i+1} : tolérance aux espaces de fin de ligne.")
+                        elif match["mode"] == "indent":
+                            fuzzy_notes.append(f"Bloc {i+1} : ajustement d'indentation uniforme.")
+                            
+                        matches.append(match)
+                        # Appliquer la modif séquentiellement sur new_text pour le match suivant
+                        new_text = new_text[:match["start"]] + match["replace"] + new_text[match["end"]:]
 
                     fuzzy_note = ""
-                    if match["mode"] == "trailing_ws":
-                        fuzzy_note = ("\nℹ️ NOTE : correspondance appliquée avec tolérance aux "
-                                      "espaces de fin de ligne (ton bloc 'search' n'était pas "
-                                      "exact au caractère près).")
-                    elif match["mode"] == "indent":
-                        fuzzy_note = ("\nℹ️ NOTE : correspondance appliquée avec ajustement "
-                                      "d'indentation uniforme (ton bloc 'search' avait un "
-                                      "décalage d'indentation ; le bloc 'replace' a été "
-                                      "réindenté en conséquence). Vérifie le résultat au "
-                                      "besoin avec read_file.")
+                    if fuzzy_notes:
+                        fuzzy_note = "\nℹ️ NOTES :\n" + "\n".join(f"- {n}" for n in fuzzy_notes)
 
-                    new_text = (original_raw[:match["start"]]
-                                + match["replace"]
-                                + original_raw[match["end"]:])
-                    # V4.3.0 : logique de diff + stats + troncature annoncée
-                    # factorisée dans _confirmation_diff (partagée avec
-                    # write_file, qui affichait auparavant... rien).
                     diff_str = self._confirmation_diff(original_raw, new_text, path)
                         
                     already_confirmed = False
@@ -1355,12 +1354,6 @@ class LiveAgentWorker(QThread):
                         if not self.ask_confirmation(msg):
                             return "ERREUR : L'utilisateur a refusé cette modification."
 
-                    # BUGFIX (TOCTOU applicatif) : le fichier a pu être modifié
-                    # de l'extérieur (éditeur intégré, autre programme) pendant
-                    # que le diff était affiché. On re-lit et on vérifie avant
-                    # d'écrire, sinon les modifications externes seraient
-                    # écrasées en silence par un new_text calculé sur une
-                    # version obsolète.
                     current_raw = self.sandbox.read_file(path, truncate=False)
                     if current_raw != original_raw:
                         return ("ÉCHEC : le fichier a été modifié pendant la demande de "
