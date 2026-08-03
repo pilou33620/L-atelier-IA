@@ -50,7 +50,7 @@
 
 ## 📖 Utilisation rapide
 
-1. **Connexion** : Au démarrage, choisissez votre mode de connexion (Clé API, Google GenAI + Claude, ou LM Studio). Vous pouvez y activer le **Mode Démonstration** pour tester l'application dans un dossier sécurisé avec un modèle gratuit.
+1. **Connexion** : Au démarrage, choisissez votre mode de connexion (**Google GenAI + Claude** ou **LM Studio**). Vous pouvez y activer le **Mode Démonstration** pour tester l'application dans un dossier sécurisé avec un modèle gratuit.
 2. **Projet** : Cliquez sur "Ouvrir un dossier" pour définir la racine du projet sur laquelle l'IA va travailler (automatique en Mode Démo).
 3. **Mission** : Dans l'onglet "Agent Codeur", décrivez votre objectif (ex: "Ajoute une fonction de tri dans utils.py et crée un test correspondant") ou utilisez le bouton "Démo technique".
 4. **Suivi** : Suivez le raisonnement de l'Orchestrateur et les actions des agents en temps réel.

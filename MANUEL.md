@@ -24,7 +24,7 @@ Bienvenue dans le manuel de L'Atelier IA. Ce guide vous explique comment configu
 
 ### Choix de la Connexion
 Au lancement, une fenêtre vous demande comment vous souhaitez connecter l'IA :
-- **🔑 Clé API (Google GenAI)** : Utilise une clé API AI Studio. Vous pouvez configurer deux clés : une principale (gratuite) et une secondaire (payante/Tier 1) pour les modèles plus puissants comme Gemini 3.1 Pro et Gemini 3.6.
+- **🔑 Google GenAI + Claude** : Utilise une clé API AI Studio (et optionnellement une clé Claude). Vous pouvez configurer deux clés : une principale (gratuite) et une secondaire (payante/Tier 1) pour les modèles plus puissants comme Gemini 3.1 Pro et Gemini 3.6.
 - **🖥️ LM Studio** : Connexion à un serveur local. Vous devez avoir LM Studio lancé avec le serveur HTTP activé (généralement sur `http://127.0.0.1:1234`).
 
 ### Mode Démonstration

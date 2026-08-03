@@ -101,16 +101,21 @@ def _is_quota_error(message):
     jamais. On ne considère désormais comme fatal que ce qui pointe vers un
     quota journalier ou un problème de crédits."""
     msg = (message or "").lower()
-    # Quota par minute -> transitoire, le retry/backoff s'en charge.
+    
+    # 1. Quota journalier -> fatal (prioritaire car une erreur peut lister les deux)
+    daily_fatal = ("per day", "perday", "per-day", "daily limit", 
+                   "free-models-per-day", "limite quotidienne", "quotidien")
+    if any(k in msg for k in daily_fatal):
+        return True
+        
+    # 2. Quota par minute -> transitoire, le retry/backoff s'en charge.
     per_minute = ("per minute", "perminute", "per-minute", "requests per min")
     if any(k in msg for k in per_minute):
         return False
-    fatal = ("credit", "prepayment", "billing", "per day", "perday", "per-day",
-             "daily limit", "free-models-per-day", "insufficient",
-             # V4.3.0 : libellés FRANÇAIS levés par notre propre RateLimiter
-             # (limite quotidienne locale) — à classer fatals eux aussi.
-             "limite quotidienne", "quotidien")
-    return any(k in msg for k in fatal)
+        
+    # 3. Autres erreurs fatales (crédits, facturation)
+    general_fatal = ("credit", "prepayment", "billing", "insufficient")
+    return any(k in msg for k in general_fatal)
 
 
 def _is_rate_or_quota_error(message):
@@ -449,7 +454,7 @@ class LLMProvider:
     def _key_slot_for(self, model_name):
         """Numéro de clé effectivement utilisé pour ce modèle.
         Retombe sur la clé 1 si la clé 2 n'est pas configurée."""
-        if self.auth_mode != "api_key":
+        if self.auth_mode not in ("api_key", "google_claude"):
             return 1
         slot = get_key_slot(model_name)
         return slot if slot in self.clients else 1

@@ -336,20 +336,14 @@ class ConnectionDialog(QDialog):
         layout.addWidget(QLabel("2. Choisissez votre méthode de connexion à l'IA :"))
 
         self.auth_group = QButtonGroup(self)
-        self.radio_api = QRadioButton("🔑 Clé API (Fichier .txt) - Google GenAI")
         self.radio_google_claude = QRadioButton("🔑 Google GenAI + Claude")
-        self.radio_claude = QRadioButton("🔑 Claude (OneProvider)")
         self.radio_lmstudio = QRadioButton("🏠 LM Studio (SDK Natif Local)")
-        self.auth_group.addButton(self.radio_api)
         self.auth_group.addButton(self.radio_google_claude)
-        self.auth_group.addButton(self.radio_claude)
         self.auth_group.addButton(self.radio_lmstudio)
         # Sélection par défaut
-        self.radio_api.setChecked(True)
+        self.radio_google_claude.setChecked(True)
 
-        layout.addWidget(self.radio_api)
         layout.addWidget(self.radio_google_claude)
-        layout.addWidget(self.radio_claude)
         layout.addWidget(self.radio_lmstudio)
         
         layout.addSpacing(15)
@@ -415,16 +409,88 @@ class ConnectionDialog(QDialog):
         layout.addWidget(QLabel("<b>Modèle LLM pour Graphify (optionnel) :</b>"))
         combo_graphify_model = QComboBox()
         combo_graphify_model.setEditable(True)
-        combo_graphify_model.addItems([
-            "Par défaut (Auto)",
-            "gemini-1.5-pro",
-            "gemini-1.5-flash",
-            "claude-3-5-sonnet-20240620",
-            "gpt-4o"
-        ])
-        saved_model = settings.value("graphify_model_name", "Par défaut (Auto)", type=str)
-        combo_graphify_model.setCurrentText(saved_model)
+        
+        def update_graphify_models(index):
+            combo_graphify_model.clear()
+            if index == 0:
+                combo_graphify_model.addItems(["Par défaut (Auto)", "gemma-4-31b-it"])
+            elif index == 1:
+                combo_graphify_model.addItems(["Par défaut (Auto)", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-extended", "gemini-3.6-flash", "gemini-3.6-flash-thinking"])
+            elif index == 2:
+                combo_graphify_model.addItems(["Par défaut (Auto)", "claude-opus-4-8[1m]", "claude-fable-5[1m]"])
+            
+            # Essayer de restaurer la valeur sauvegardée, sinon 0
+            saved = settings.value("graphify_model_name", "Par défaut (Auto)", type=str)
+            if combo_graphify_model.findText(saved) != -1:
+                combo_graphify_model.setCurrentText(saved)
+            else:
+                combo_graphify_model.setCurrentIndex(0)
+
+        combo_graphify_key.currentIndexChanged.connect(update_graphify_models)
+        
+        # Initialisation avec l'index actuel
+        update_graphify_models(combo_graphify_key.currentIndex())
         layout.addWidget(combo_graphify_model)
+        
+        test_btn = QPushButton("Tester la connexion (LLM)")
+        def test_graphify_connection():
+            idx = combo_graphify_key.currentIndex()
+            if idx == 0:
+                filepath = settings.value("api_file_path", "", type=str)
+            elif idx == 1:
+                filepath = settings.value("api_file_path_2", "", type=str)
+            else:
+                filepath = settings.value("api_file_path_claude", "", type=str)
+            
+            api_key = ""
+            import os
+            if filepath and os.path.exists(filepath):
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        api_key = f.read().strip()
+                except Exception:
+                    pass
+            
+            if not api_key:
+                QMessageBox.warning(dialog, "Erreur", "Aucune clé API trouvée pour ce mode (fichier introuvable ou vide).")
+                return
+                
+            model = combo_graphify_model.currentText()
+            if model == "Par défaut (Auto)":
+                if idx == 0: model = "gemma-4-31b-it"
+                elif idx == 1: model = "gemini-3.1-pro-preview"
+                else: model = "claude-opus-4-8[1m]"
+                
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                res_text = ""
+                if "claude" in model.lower():
+                    from core.llm import _init_anthropic_client
+                    client = _init_anthropic_client(api_key)
+                    if not client:
+                        raise Exception("Impossible d'initialiser Anthropic.")
+                    response = client.messages.create(
+                        model=model, max_tokens=10,
+                        messages=[{"role": "user", "content": "Réponds juste 'Test OK'."}]
+                    )
+                    res_text = response.content[0].text
+                else:
+                    from google import genai
+                    client = genai.Client(api_key=api_key)
+                    response = client.models.generate_content(
+                        model=model,
+                        contents="Réponds juste 'Test OK'."
+                    )
+                    res_text = response.text
+                
+                QApplication.restoreOverrideCursor()
+                QMessageBox.information(dialog, "Succès", f"Connexion LLM réussie avec {model} !\nRéponse : {res_text}")
+            except Exception as e:
+                QApplication.restoreOverrideCursor()
+                QMessageBox.critical(dialog, "Erreur de connexion", f"Le modèle {model} a échoué :\n{e}")
+
+        test_btn.clicked.connect(test_graphify_connection)
+        layout.addWidget(test_btn)
         
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
@@ -536,12 +602,8 @@ git push -u origin main</pre>
         elif self.radio_mode_meca.isChecked():
             app_mode = "meca"
 
-        auth_mode = "api_key"
-        if self.radio_google_claude.isChecked():
-            auth_mode = "google_claude"
-        elif self.radio_claude.isChecked():
-            auth_mode = "claude"
-        elif self.radio_lmstudio.isChecked():
+        auth_mode = "google_claude"
+        if self.radio_lmstudio.isChecked():
             auth_mode = "lm_studio"
             
         is_demo = self.demo_checkbox.isChecked()
