@@ -400,8 +400,7 @@ class ConnectionDialog(QDialog):
         combo_graphify_key = QComboBox()
         combo_graphify_key.addItems([
             "Même clé que l'agent (Défaut)",
-            "Forcer la Clé 2 (Optionnelle)",
-            "Forcer la Clé Claude"
+            "Forcer la Clé 2 (Optionnelle)"
         ])
         combo_graphify_key.setCurrentIndex(settings.value("graphify_api_key_choice", 0, type=int))
         layout.addWidget(combo_graphify_key)
@@ -416,8 +415,6 @@ class ConnectionDialog(QDialog):
                 combo_graphify_model.addItems(["Par défaut (Auto)", "gemma-4-31b-it"])
             elif index == 1:
                 combo_graphify_model.addItems(["Par défaut (Auto)", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-extended", "gemini-3.6-flash", "gemini-3.6-flash-thinking"])
-            elif index == 2:
-                combo_graphify_model.addItems(["Par défaut (Auto)", "claude-opus-4-8[1m]", "claude-fable-5[1m]"])
             
             # Essayer de restaurer la valeur sauvegardée, sinon 0
             saved = settings.value("graphify_model_name", "Par défaut (Auto)", type=str)
@@ -439,8 +436,6 @@ class ConnectionDialog(QDialog):
                 filepath = settings.value("api_file_path", "", type=str)
             elif idx == 1:
                 filepath = settings.value("api_file_path_2", "", type=str)
-            else:
-                filepath = settings.value("api_file_path_claude", "", type=str)
             
             api_key = ""
             import os
@@ -459,29 +454,17 @@ class ConnectionDialog(QDialog):
             if model == "Par défaut (Auto)":
                 if idx == 0: model = "gemma-4-31b-it"
                 elif idx == 1: model = "gemini-3.1-pro-preview"
-                else: model = "claude-opus-4-8[1m]"
                 
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             try:
                 res_text = ""
-                if "claude" in model.lower():
-                    from core.llm import _init_anthropic_client
-                    client = _init_anthropic_client(api_key)
-                    if not client:
-                        raise Exception("Impossible d'initialiser Anthropic.")
-                    response = client.messages.create(
-                        model=model, max_tokens=10,
-                        messages=[{"role": "user", "content": "Réponds juste 'Test OK'."}]
-                    )
-                    res_text = response.content[0].text
-                else:
-                    from google import genai
-                    client = genai.Client(api_key=api_key)
-                    response = client.models.generate_content(
-                        model=model,
-                        contents="Réponds juste 'Test OK'."
-                    )
-                    res_text = response.text
+                from google import genai
+                client = genai.Client(api_key=api_key)
+                response = client.models.generate_content(
+                    model=model,
+                    contents="Réponds juste 'Test OK'."
+                )
+                res_text = response.text
                 
                 QApplication.restoreOverrideCursor()
                 QMessageBox.information(dialog, "Succès", f"Connexion LLM réussie avec {model} !\nRéponse : {res_text}")
