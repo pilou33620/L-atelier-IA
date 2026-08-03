@@ -354,8 +354,21 @@ class LiveAgentWorker(QThread):
         self.api_key_2 = api_key_2
         self.api_key_claude = api_key_claude
         self.mission = mission
-        self.mission_images = list(mission_images) if mission_images else []
+        
+        from PyQt6.QtCore import QSettings
+        settings = QSettings("Antigravity", "LAtelierIA")
+        choice = settings.value("graphify_api_key_choice", 0, type=int)
+        
+        self.graphify_api_key = self.api_key
+        if choice == 1 and self.api_key_2:
+            self.graphify_api_key = self.api_key_2
+        elif choice == 2 and self.api_key_claude:
+            self.graphify_api_key = self.api_key_claude
+            
+        self.graphify_model_name = settings.value("graphify_model_name", "Par défaut (Auto)", type=str)
+            
         self.project_root = project_root
+        self.mission_images = list(mission_images) if mission_images else []
         self.active_agents = active_agents or {}
         self.lm_url = lm_url
         self.extra_rules = extra_rules
@@ -1044,7 +1057,17 @@ class LiveAgentWorker(QThread):
         name = action.get("action")
         args = action.get("args", {}) or {}
         
-        target = str(args.get("path") or args.get("pattern") or args.get("query") or args.get("command") or args.get("agent") or "")
+        target = str(
+            args.get("path") or 
+            args.get("pattern") or 
+            args.get("query") or 
+            args.get("command") or 
+            args.get("agent") or 
+            args.get("node") or 
+            args.get("node_a") or 
+            args.get("question") or 
+            ""
+        )
         self.agent_action_event.emit(current_agent_id, name, target)
         
         try:
@@ -1102,7 +1125,7 @@ class LiveAgentWorker(QThread):
                 if not self.ask_confirmation(msg):
                     return "ERREUR : L'utilisateur a refusé l'exécution de graphify."
                 self.status_update.emit(f"🧠 [GRAPHIFY QUERY] Question : {query}\n")
-                result = self.sandbox.graphify_query(query, self.api_key)
+                result = self.sandbox.graphify_query(query, getattr(self, "graphify_api_key", self.api_key), getattr(self, "graphify_model_name", None))
                 self.status_update.emit(f"🧠 [GRAPHIFY RÉPONSE] :\n{result}\n")
                 return f"Graphify (Query) : {query}\n" + result
 
@@ -1120,9 +1143,69 @@ class LiveAgentWorker(QThread):
                 if not self.ask_confirmation(msg):
                     return "ERREUR : L'utilisateur a refusé l'exécution de graphify."
                 self.status_update.emit(f"🧠 [GRAPHIFY PATH] Chemin de {node_a} vers {node_b}\n")
-                result = self.sandbox.graphify_path(node_a, node_b, self.api_key)
+                result = self.sandbox.graphify_path(node_a, node_b, getattr(self, "graphify_api_key", self.api_key), getattr(self, "graphify_model_name", None))
                 self.status_update.emit(f"🧠 [GRAPHIFY RÉPONSE] :\n{result}\n")
                 return f"Graphify (Path) de {node_a} à {node_b}:\n" + result
+
+            if name == "graphify_explain":
+                node_name = args.get("node")
+                if not node_name:
+                    return "ERREUR : 'node' est requis pour graphify_explain."
+                msg = (f"L'agent veut interroger le binaire externe 'graphify' avec :\n"
+                       f"graphify explain {node_name!r}\n\n"
+                       f"⚠️ Cette commande tierce s'exécute sur votre machine.\nAutoriser ?")
+                if not self.ask_confirmation(msg):
+                    return "ERREUR : L'utilisateur a refusé l'exécution de graphify explain."
+                self.status_update.emit(f"🧠 [GRAPHIFY EXPLAIN] {node_name}\n")
+                result = self.sandbox.graphify_explain(node_name, getattr(self, "graphify_api_key", self.api_key), getattr(self, "graphify_model_name", None))
+                self.status_update.emit(f"🧠 [GRAPHIFY RÉPONSE] :\n{result}\n")
+                return f"Graphify (Explain) {node_name}:\n" + result
+
+            if name == "graphify_save_result":
+                question = args.get("question")
+                answer = args.get("answer")
+                nodes = args.get("nodes", "")
+                outcome = args.get("outcome", "useful")
+                if not question or not answer:
+                    return "ERREUR : 'question' et 'answer' sont requis."
+                self.status_update.emit(f"🧠 [GRAPHIFY MEMORY] Enregistrement d'une solution pour {nodes}\n")
+                result = self.sandbox.graphify_save_result(question, answer, nodes, outcome)
+                return result
+
+            if name == "graphify_reflect":
+                self.status_update.emit(f"🧠 [GRAPHIFY REFLECT] Apprentissage continu en cours...\n")
+                result = self.sandbox.graphify_reflect()
+                self.status_update.emit(f"🧠 [GRAPHIFY REFLECT] Terminé.\n")
+                return result
+
+            if name == "graphify_export_callflow":
+                self.status_update.emit(f"🧠 [GRAPHIFY EXPORT] Génération Callflow HTML demandée par l'agent.\n")
+                msg = ("L'agent veut générer et ouvrir la carte interactive Callflow HTML dans votre navigateur.\nAutoriser ?")
+                if not self.ask_confirmation(msg):
+                    return "ERREUR : L'utilisateur a refusé l'ouverture de la carte."
+                
+                import subprocess
+                from PyQt6.QtGui import QDesktopServices
+                from PyQt6.QtCore import QUrl
+                from pathlib import Path
+                import os
+                
+                graphify_bin = resolve_external_binary("graphify")
+                if not graphify_bin:
+                    return "ERREUR : binaire graphify introuvable."
+                
+                try:
+                    subprocess.run([graphify_bin, "export", "callflow-html", "."], cwd=self.sandbox.root, capture_output=True, env=hardened_subprocess_env(), timeout=180)
+                    project_name = Path(self.sandbox.root).name
+                    html_path = os.path.join(self.sandbox.root, "graphify-out", f"{project_name}-callflow.html")
+                    
+                    if os.path.exists(html_path):
+                        QDesktopServices.openUrl(QUrl.fromLocalFile(html_path))
+                        return "Succès : La carte a été générée et ouverte dans le navigateur."
+                    else:
+                        return "ERREUR : Fichier HTML introuvable après génération."
+                except Exception as e:
+                    return f"ERREUR lors de l'export Callflow : {e}"
 
             if name == "read_url":
                 url = args.get("url")

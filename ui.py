@@ -371,6 +371,12 @@ class ConnectionDialog(QDialog):
         
         layout.addStretch()
 
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btn_box.button(QDialogButtonBox.StandardButton.Ok).setText("Démarrer")
+        btn_box.accepted.connect(self.accept)
+        btn_box.rejected.connect(self.reject)
+        layout.addWidget(btn_box)
+
     def open_settings(self):
         from PyQt6.QtCore import QSettings
         settings = QSettings("Antigravity", "LAtelierIA")
@@ -392,6 +398,34 @@ class ConnectionDialog(QDialog):
         cb_auto_clean_ds.setChecked(settings.value("auto_clean_data_sheets", True, type=bool))
         layout.addWidget(cb_auto_clean_ds)
         
+        cb_graphify_code_only = QCheckBox("Graphify : Indexer uniquement le code (Économique / Rapide)")
+        cb_graphify_code_only.setChecked(settings.value("graphify_code_only", True, type=bool))
+        layout.addWidget(cb_graphify_code_only)
+        
+        layout.addWidget(QLabel("<b>Clé API dédiée pour Graphify :</b>"))
+        combo_graphify_key = QComboBox()
+        combo_graphify_key.addItems([
+            "Même clé que l'agent (Défaut)",
+            "Forcer la Clé 2 (Optionnelle)",
+            "Forcer la Clé Claude"
+        ])
+        combo_graphify_key.setCurrentIndex(settings.value("graphify_api_key_choice", 0, type=int))
+        layout.addWidget(combo_graphify_key)
+        
+        layout.addWidget(QLabel("<b>Modèle LLM pour Graphify (optionnel) :</b>"))
+        combo_graphify_model = QComboBox()
+        combo_graphify_model.setEditable(True)
+        combo_graphify_model.addItems([
+            "Par défaut (Auto)",
+            "gemini-1.5-pro",
+            "gemini-1.5-flash",
+            "claude-3-5-sonnet-20240620",
+            "gpt-4o"
+        ])
+        saved_model = settings.value("graphify_model_name", "Par défaut (Auto)", type=str)
+        combo_graphify_model.setCurrentText(saved_model)
+        layout.addWidget(combo_graphify_model)
+        
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
@@ -399,6 +433,9 @@ class ConnectionDialog(QDialog):
         def save_and_close():
             settings.setValue("auto_clean_docs_gen", cb_auto_clean.isChecked())
             settings.setValue("auto_clean_data_sheets", cb_auto_clean_ds.isChecked())
+            settings.setValue("graphify_code_only", cb_graphify_code_only.isChecked())
+            settings.setValue("graphify_api_key_choice", combo_graphify_key.currentIndex())
+            settings.setValue("graphify_model_name", combo_graphify_model.currentText())
             dialog.accept()
             
         save_btn.clicked.connect(save_and_close)
@@ -410,11 +447,6 @@ class ConnectionDialog(QDialog):
         
         layout.addLayout(btn_layout)
         dialog.exec()
-
-        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        btn_box.accepted.connect(self.accept)
-        btn_box.rejected.connect(self.reject)
-        layout.addWidget(btn_box)
 
     def show_github_tutorials(self):
         dialog = QDialog(self)
@@ -780,8 +812,12 @@ class MainWindow(QMainWindow):
         # désormais exécuté dans un FunctionWorker.
         self.graphify_btn.setEnabled(False)
         self.graphify_btn.setText("⏳ Construction...")
+        
+        from PyQt6.QtCore import QSettings
+        settings = QSettings("Antigravity", "LAtelierIA")
+        code_only = settings.value("graphify_code_only", True, type=bool)
 
-        self._graphify_build_worker = FunctionWorker(self.sandbox.graphify_build, target_dir=selected_path)
+        self._graphify_build_worker = FunctionWorker(self.sandbox.graphify_build, target_dir=selected_path, code_only=code_only)
         self._graphify_build_worker.finished_task.connect(self._on_graphify_build_finished)
         self._graphify_build_worker.start()
 
@@ -1210,6 +1246,13 @@ git push -u origin main</pre>"""
         if self.app_mode != "coder":
             self.view_html_btn.hide()
         icons_layout.addWidget(self.view_html_btn)
+        
+        self.callflow_html_btn = QPushButton("🗺️")
+        self.callflow_html_btn.setToolTip("Générer et voir la carte interactive de l'architecture (Callflow HTML)")
+        self.callflow_html_btn.clicked.connect(self.show_callflow_html)
+        if self.app_mode != "coder":
+            self.callflow_html_btn.hide()
+        icons_layout.addWidget(self.callflow_html_btn)
         
         btn_layout.addLayout(icons_layout)
         
@@ -1911,6 +1954,44 @@ git push -u origin main</pre>"""
             QDesktopServices.openUrl(QUrl.fromLocalFile(target_html))
         else:
             QMessageBox.warning(self, "Erreur", "Le fichier HTML interactif n'a pas pu être trouvé ou généré.")
+
+    def show_callflow_html(self):
+        if not self.sandbox: return
+        import subprocess
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtWidgets import QMessageBox
+        
+        graph_json = os.path.join(self.sandbox.root, "graphify-out", "graph.json")
+        if not os.path.exists(graph_json):
+            QMessageBox.warning(self, "Erreur", "Générez d'abord le graphe (Bouton 'Graphify').")
+            return
+            
+        self.callflow_html_btn.setText("⏳")
+        QApplication.processEvents()
+        
+        graphify_bin = resolve_external_binary("graphify")
+        if not graphify_bin:
+            self.callflow_html_btn.setText("🗺️")
+            QMessageBox.critical(self, "Erreur", "Binaire 'graphify' introuvable sur le PATH.")
+            return
+
+        try:
+            subprocess.run([graphify_bin, "export", "callflow-html", "."], cwd=self.sandbox.root, capture_output=True, env=hardened_subprocess_env(), timeout=180)
+            
+            project_name = Path(self.sandbox.root).name
+            html_path = os.path.join(self.sandbox.root, "graphify-out", f"{project_name}-callflow.html")
+            
+            if os.path.exists(html_path):
+                QDesktopServices.openUrl(QUrl.fromLocalFile(html_path))
+            else:
+                QMessageBox.warning(self, "Erreur", "Le fichier HTML Callflow n'a pas pu être trouvé ou généré.")
+        except subprocess.TimeoutExpired:
+            QMessageBox.critical(self, "Erreur", "La génération du Callflow HTML a dépassé 180 s et a été interrompue.")
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de générer le Callflow HTML: {e}")
+        finally:
+            self.callflow_html_btn.setText("🗺️")
 
     def save_current_file(self):
         if not self.current_file:

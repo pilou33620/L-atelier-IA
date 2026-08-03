@@ -840,17 +840,12 @@ except Exception as e:
             return "Aucun résultat trouvé."
         return "\n".join(results)
 
-    def graphify_build(self, target_dir="."):
+    def graphify_build(self, target_dir=".", code_only=True):
         """Construit ou met à jour le graphe structurel Graphify (graph.json).
 
-        SÉCURITÉ / ARCHITECTURE (v4.2.0) : le binaire tiers 'graphify' est
-        désormais TOUJOURS lancé en mode '--code-only' :
-          - la clé API n'est JAMAIS transmise à ce binaire lors du build
-            (suppression de l'exposition de GEMINI_API_KEY à un exécutable
-            externe pour cette étape) ;
-          - l'enrichissement sémantique n'est plus délégué à graphify : le
-            rapport GRAPH_REPORT.md est généré par le LLM de l'application
-            (GraphifyAnalysisWorker) à partir de graph.json.
+        SÉCURITÉ / ARCHITECTURE (v4.2.0) : le binaire tiers 'graphify' était
+        précédemment toujours lancé en mode '--code-only'. Désormais c'est une 
+        option réglable depuis l'interface (code_only).
         NB : le message de succès référence 'graphify-out/' (et non plus
         'graph-out/'), en cohérence avec les chemins lus partout ailleurs
         dans l'application (analyse, visualisation)."""
@@ -859,16 +854,29 @@ except Exception as e:
             return ("Impossible de lancer graphify : binaire introuvable sur "
                     "le PATH de l'application. Assurez-vous qu'il est installé.")
         try:
+            cmd = [graphify_bin, target_dir, "--out", "."]
+            if code_only:
+                cmd.insert(2, "--code-only")
+                
+            env = hardened_subprocess_env()
+            if not code_only:
+                import os
+                if "GEMINI_API_KEY" in os.environ:
+                    env["GEMINI_API_KEY"] = os.environ["GEMINI_API_KEY"]
+                elif "ANTHROPIC_API_KEY" in os.environ:
+                    env["ANTHROPIC_API_KEY"] = os.environ["ANTHROPIC_API_KEY"]
+
             proc = subprocess.run(
-                [graphify_bin, target_dir, "--code-only", "--out", "."],
+                cmd,
                 cwd=str(self.root),
                 capture_output=True,
                 text=True,
-                timeout=300,
-                env=hardened_subprocess_env()
+                timeout=600,
+                env=env
             )
             if proc.returncode == 0:
-                return (f"Graphe Graphify (structure seule) généré avec succès pour '{target_dir}' dans "
+                mode_str = " (structure seule)" if code_only else " (multimodal)"
+                return (f"Graphe Graphify{mode_str} généré avec succès pour '{target_dir}' dans "
                         "'graphify-out/'. Utilisez « 🧠 Analyse Graphify » pour "
                         "générer GRAPH_REPORT.md via votre LLM.")
             else:
@@ -876,7 +884,7 @@ except Exception as e:
         except Exception as e:
             return f"Impossible de lancer graphify : {e}. Assurez-vous qu'il est installé."
 
-    def graphify_query(self, query, api_key=None):
+    def graphify_query(self, query, api_key=None, model_name=None):
         """Interroge le graphe avec une question en langage naturel."""
         graphify_bin = resolve_external_binary("graphify")
         if not graphify_bin:
@@ -884,10 +892,17 @@ except Exception as e:
         try:
             env = hardened_subprocess_env()
             if api_key:
-                env["GEMINI_API_KEY"] = api_key
+                if api_key.startswith("sk-ant"):
+                    env["ANTHROPIC_API_KEY"] = api_key
+                else:
+                    env["GEMINI_API_KEY"] = api_key
+                
+            cmd = [graphify_bin, "query", query]
+            if model_name and model_name != "Par défaut (Auto)":
+                cmd.extend(["--model", model_name])
                 
             proc = subprocess.run(
-                [graphify_bin, "query", query],
+                cmd,
                 cwd=str(self.root),
                 capture_output=True,
                 text=True,
@@ -904,7 +919,7 @@ except Exception as e:
         except Exception as e:
             return f"Impossible de requêter graphify : {e}"
 
-    def graphify_path(self, node_a, node_b, api_key=None):
+    def graphify_path(self, node_a, node_b, api_key=None, model_name=None):
         """Trouve le chemin entre deux nœuds dans le graphe."""
         graphify_bin = resolve_external_binary("graphify")
         if not graphify_bin:
@@ -912,10 +927,17 @@ except Exception as e:
         try:
             env = hardened_subprocess_env()
             if api_key:
-                env["GEMINI_API_KEY"] = api_key
+                if api_key.startswith("sk-ant"):
+                    env["ANTHROPIC_API_KEY"] = api_key
+                else:
+                    env["GEMINI_API_KEY"] = api_key
+                
+            cmd = [graphify_bin, "path", node_a, node_b]
+            if model_name and model_name != "Par défaut (Auto)":
+                cmd.extend(["--model", model_name])
                 
             proc = subprocess.run(
-                [graphify_bin, "path", node_a, node_b],
+                cmd,
                 cwd=str(self.root),
                 capture_output=True,
                 text=True,
@@ -931,6 +953,89 @@ except Exception as e:
                 return f"Erreur lors de la recherche de chemin Graphify:\n{err_msg}"
         except Exception as e:
             return f"Impossible de chercher un chemin graphify : {e}"
+
+    def graphify_explain(self, node_name, api_key=None, model_name=None):
+        """Demande une explication sur un composant via graphify."""
+        graphify_bin = resolve_external_binary("graphify")
+        if not graphify_bin:
+            return "Impossible d'expliquer via graphify : binaire introuvable."
+        try:
+            env = hardened_subprocess_env()
+            if api_key:
+                if api_key.startswith("sk-ant"):
+                    env["ANTHROPIC_API_KEY"] = api_key
+                else:
+                    env["GEMINI_API_KEY"] = api_key
+                
+            cmd = [graphify_bin, "explain", node_name]
+            if model_name and model_name != "Par défaut (Auto)":
+                cmd.extend(["--model", model_name])
+                
+            proc = subprocess.run(
+                cmd,
+                cwd=str(self.root),
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=60
+            )
+            if proc.returncode == 0:
+                return proc.stdout.strip() if proc.stdout else "Aucune explication trouvée."
+            else:
+                err_msg = proc.stderr or ""
+                if api_key:
+                    err_msg = err_msg.replace(api_key, "[CLÉ API MASQUÉE]")
+                return f"Erreur lors de l'explication Graphify:\n{err_msg}"
+        except Exception as e:
+            return f"Impossible de lancer graphify explain : {e}"
+
+    def graphify_save_result(self, question, answer, nodes, outcome="useful"):
+        """Enregistre le résultat d'une recherche ou solution pour la mémoire à long terme."""
+        graphify_bin = resolve_external_binary("graphify")
+        if not graphify_bin:
+            return "Impossible d'enregistrer le résultat : binaire introuvable."
+        try:
+            env = hardened_subprocess_env()
+            nodes_args = nodes.split() if isinstance(nodes, str) else list(nodes)
+            cmd = [graphify_bin, "save-result", "--question", question, "--answer", answer, "--outcome", outcome, "--nodes"] + nodes_args
+            
+            proc = subprocess.run(
+                cmd,
+                cwd=str(self.root),
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=30
+            )
+            if proc.returncode == 0:
+                return "Résultat enregistré avec succès dans la mémoire de travail de Graphify."
+            else:
+                return f"Erreur lors de l'enregistrement Graphify:\n{proc.stderr or ''}"
+        except Exception as e:
+            return f"Impossible de lancer graphify save-result : {e}"
+
+    def graphify_reflect(self):
+        """Déclenche la réflexion et l'apprentissage continu de Graphify."""
+        graphify_bin = resolve_external_binary("graphify")
+        if not graphify_bin:
+            return "Impossible de lancer la réflexion : binaire introuvable."
+        try:
+            env = hardened_subprocess_env()
+            proc = subprocess.run(
+                [graphify_bin, "reflect", "--if-stale"],
+                cwd=str(self.root),
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=120
+            )
+            if proc.returncode == 0:
+                out = proc.stdout.strip()
+                return out if out else "Réflexion terminée. Les leçons (LESSONS.md) sont à jour."
+            else:
+                return f"Erreur lors de la réflexion Graphify:\n{proc.stderr or ''}"
+        except Exception as e:
+            return f"Impossible de lancer graphify reflect : {e}"
 
     def download_mcp_kicad_part(self, mpn):
         """Télécharge la librairie KiCad (symbole + empreinte) pour un composant depuis pcbparts.dev.
