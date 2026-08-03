@@ -358,12 +358,58 @@ class ConnectionDialog(QDialog):
         layout.addWidget(self.demo_checkbox)
         
         layout.addSpacing(10)
+        
+        self.settings_btn = QPushButton("⚙️ Réglages")
+        self.settings_btn.setToolTip("Paramètres de l'application")
+        self.settings_btn.clicked.connect(self.open_settings)
+        layout.addWidget(self.settings_btn)
+        
         self.github_btn = QPushButton("🐙 GitHub")
         self.github_btn.setToolTip("Afficher les tutoriels GitHub (Création et Mise à jour)")
         self.github_btn.clicked.connect(self.show_github_tutorials)
         layout.addWidget(self.github_btn)
         
         layout.addStretch()
+
+    def open_settings(self):
+        from PyQt6.QtCore import QSettings
+        settings = QSettings("Antigravity", "LAtelierIA")
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Réglages")
+        dialog.resize(400, 150)
+        
+        layout = QVBoxLayout(dialog)
+        
+        layout.addWidget(QLabel("<b>Paramètres de l'application</b>"))
+        
+        cb_auto_clean = QCheckBox("Nettoyer le dossier docs_gen/ (Assistant Général) lors du nettoyage")
+        # Par défaut True (vrai)
+        cb_auto_clean.setChecked(settings.value("auto_clean_docs_gen", True, type=bool))
+        layout.addWidget(cb_auto_clean)
+        
+        cb_auto_clean_ds = QCheckBox("Nettoyer le dossier data_sheets/ (Mode Hardware) lors du nettoyage")
+        cb_auto_clean_ds.setChecked(settings.value("auto_clean_data_sheets", True, type=bool))
+        layout.addWidget(cb_auto_clean_ds)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        save_btn = QPushButton("Enregistrer")
+        def save_and_close():
+            settings.setValue("auto_clean_docs_gen", cb_auto_clean.isChecked())
+            settings.setValue("auto_clean_data_sheets", cb_auto_clean_ds.isChecked())
+            dialog.accept()
+            
+        save_btn.clicked.connect(save_and_close)
+        btn_layout.addWidget(save_btn)
+        
+        cancel_btn = QPushButton("Annuler")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(cancel_btn)
+        
+        layout.addLayout(btn_layout)
+        dialog.exec()
 
         btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btn_box.accepted.connect(self.accept)
@@ -1476,6 +1522,13 @@ git push -u origin main</pre>"""
         self.attach_btn_gen.clicked.connect(self.on_attach_image_gen)
         controls_hbox.addWidget(self.attach_btn_gen)
         
+        self.import_pdf_btn_gen = QPushButton("📄")
+        self.import_pdf_btn_gen.setFixedSize(32, 32)
+        self.import_pdf_btn_gen.setToolTip("Importer et convertir des PDF en JSON")
+        self.import_pdf_btn_gen.clicked.connect(self.on_import_pdf_gen)
+        controls_hbox.addWidget(self.import_pdf_btn_gen)
+
+        
         self.stop_btn_gen = QPushButton("🛑")
         self.stop_btn_gen.setFixedSize(32, 32)
         self.stop_btn_gen.setEnabled(False)
@@ -1983,6 +2036,23 @@ git push -u origin main</pre>"""
                         os.remove(mem_file)
                     except Exception as e:
                         print(f"Erreur suppression {mem_file}: {e}")
+                        
+                import shutil
+                docs_gen_dir = os.path.join(self.project_root, "docs_gen")
+                auto_clean = self.settings.value("auto_clean_docs_gen", True, type=bool)
+                if auto_clean and os.path.exists(docs_gen_dir):
+                    try:
+                        shutil.rmtree(docs_gen_dir)
+                    except Exception as e:
+                        print(f"Erreur suppression {docs_gen_dir}: {e}")
+                        
+                data_sheets_dir = os.path.join(self.project_root, "data_sheets")
+                auto_clean_ds = self.settings.value("auto_clean_data_sheets", True, type=bool)
+                if auto_clean_ds and os.path.exists(data_sheets_dir):
+                    try:
+                        shutil.rmtree(data_sheets_dir)
+                    except Exception as e:
+                        print(f"Erreur suppression {data_sheets_dir}: {e}")
                 
                 # Nettoyer aussi le __pycache__ si souhaité, etc. (optionnel)
                 
@@ -2091,6 +2161,47 @@ git push -u origin main</pre>"""
             names = [os.path.basename(f) for f in self.selected_images_gen]
             self.image_lbl_gen.setText("🖼️ " + ", ".join(names))
             self.image_lbl_gen.show()
+
+    def on_import_pdf_gen(self):
+        if not hasattr(self, 'project_root') or not self.project_root:
+            QMessageBox.warning(self, "Erreur", "Veuillez d'abord ouvrir un dossier projet (en haut à gauche).")
+            return
+
+        files, _ = QFileDialog.getOpenFileNames(self, "Sélectionner les PDFs", "", "Fichiers PDF (*.pdf)")
+        if not files:
+            return
+            
+        try:
+            import importlib.util
+            import sys
+            
+            script_path = os.path.join(os.path.dirname(__file__), "hardware", "convertisseur PDF-Json.py")
+            if not os.path.exists(script_path):
+                QMessageBox.critical(self, "Erreur", "Le script 'convertisseur PDF-Json.py' est introuvable.")
+                return
+                
+            spec = importlib.util.spec_from_file_location("convertisseur_pdf_json", script_path)
+            convertisseur = importlib.util.module_from_spec(spec)
+            sys.modules["convertisseur_pdf_json"] = convertisseur
+            spec.loader.exec_module(convertisseur)
+            
+            self._safe_append(self.chat_view_gen, html_text='<div style="margin:8px 0;padding:8px 10px;background:#333;border-radius:8px;">⏳ <b>Système :</b> Importation et conversion des PDF en cours...</div>')
+            QApplication.processEvents()
+            
+            convertisseur.process_multiple_pdfs(files, self.project_root, target_folder_name="docs_gen")
+            
+            self._safe_append(self.chat_view_gen, html_text='<div style="margin:8px 0;padding:8px 10px;background:#1e4d2b;border-radius:8px;">✅ <b>Système :</b> PDF convertis avec succès. Ils sont disponibles dans le dossier <code>docs_gen/</code>.</div>')
+            
+            msg_user = "Système : Des fichiers PDF ont été importés et convertis en JSON. Ils sont accessibles dans le sous-dossier 'docs_gen/' du projet courant. Tu pourras les utiliser avec l'outil de lecture de fichier si l'utilisateur te pose des questions à leur sujet."
+            msg_assistant = "C'est noté. Je sais que des documents ont été importés dans le dossier 'docs_gen/'."
+            self.gen_history.append({"role": "user", "content": msg_user})
+            self.gen_history.append({"role": "assistant", "content": msg_assistant})
+            
+            QMessageBox.information(self, "Succès", "L'importation et la conversion des PDF sont terminées !")
+        except Exception as e:
+            self._safe_append(self.chat_view_gen, html_text=f'<div style="margin:8px 0;padding:8px 10px;background:#5a1919;border-radius:8px;">❌ <b>Erreur lors de la conversion :</b> {self._esc(str(e))}</div>')
+            QMessageBox.critical(self, "Erreur", f"Une erreur est survenue :\n{e}")
+
 
     def on_attach_image_live(self):
         files, _ = QFileDialog.getOpenFileNames(

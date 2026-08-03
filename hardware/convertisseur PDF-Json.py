@@ -108,9 +108,9 @@ def convert_pdf_to_markdown(pdf_path: str, output_dir: str, link_prefix: str = "
         json.dump(document_data, json_file, indent=4, ensure_ascii=False)
 
 
-def process_multiple_pdfs(pdf_paths: list, base_output_dir: str) -> None:
+def process_multiple_pdfs(pdf_paths: list, base_output_dir: str, target_folder_name: str = "data_sheets") -> None:
     """
-    Convertit chaque PDF dans le dossier 'data_sheets/' du projet.
+    Convertit chaque PDF dans le dossier cible (par défaut 'data_sheets/') du projet.
 
     BUGFIX CRITIQUE (V4.4.0) : l'ancienne version écrivait dans
     'datasheet/<composant>/<composant>.json' alors que l'Agent Composant
@@ -124,11 +124,11 @@ def process_multiple_pdfs(pdf_paths: list, base_output_dir: str) -> None:
     (data_sheets/<composant>_images/...), utilisables tels quels par
     read_image.
     """
-    datasheet_dir = os.path.join(base_output_dir, "data_sheets")
-    os.makedirs(datasheet_dir, exist_ok=True)
+    target_dir = os.path.join(base_output_dir, target_folder_name)
+    os.makedirs(target_dir, exist_ok=True)
     
     for pdf_path in pdf_paths:
-        convert_pdf_to_markdown(pdf_path, datasheet_dir, link_prefix="data_sheets/")
+        convert_pdf_to_markdown(pdf_path, target_dir, link_prefix=f"{target_folder_name}/")
 
 
 def select_pdf(label_var: tk.StringVar, pdf_paths_list: list) -> None:
