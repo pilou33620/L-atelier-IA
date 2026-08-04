@@ -771,7 +771,7 @@ class LLMProvider:
                                 # outils — d'où la trace ci-dessous, qui est la
                                 # seule façon de le vérifier factuellement.
                                 emitted_text = "".join(emitted_parts)
-                                logger.warning(
+                                logger.info(
                                     "Claude : aucune action exploitable dans le TEXTE "
                                     "(stop_reason=%s, %d car. de texte, endpoint=%s).\n"
                                     "Blocs de contenu réellement reçus :\n%s",
@@ -788,7 +788,7 @@ class LLMProvider:
                                     salvaged = _salvage_non_text_blocks(final)
 
                                 if salvaged:
-                                    logger.warning(
+                                    logger.info(
                                         "Action récupérée dans un bloc tool_use "
                                         "(%d car.).", len(salvaged))
                                     yield "status", (

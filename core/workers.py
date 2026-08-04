@@ -2233,6 +2233,12 @@ class LiveAgentWorker(QThread):
                                     break
                         next_agent = next_agent_normalized
                         
+                        if next_agent not in self.active_agents or not self.active_agents[next_agent].get("use"):
+                            observation = f"ERREUR : Tu as tenté de déléguer à '{next_agent}', mais cet agent est DÉSACTIVÉ par l'utilisateur ou inexistant. Révise ta stratégie."
+                            self._append_to_history(current_agent_id, {"role": "user", "content": observation})
+                            self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] 🛑 {observation}\n")
+                            continue
+                        
                         total_delegations += 1
                         if total_delegations > MAX_TOTAL_DELEGATIONS:
                             msg = (f"ÉCHEC : plafond global de {MAX_TOTAL_DELEGATIONS} délégations atteint. "
@@ -2295,6 +2301,25 @@ class LiveAgentWorker(QThread):
                         if not sub_agents:
                             self._append_to_history(current_agent_id, {"role": "user", "content": "ERREUR: liste d'agents vide."})
                             continue
+                            
+                        valid_sub_agents = []
+                        invalid_sub_agents = []
+                        for cfg in sub_agents:
+                            ag_id = cfg.get("agent")
+                            if not ag_id:
+                                continue
+                            if ag_id in self.active_agents and self.active_agents[ag_id].get("use"):
+                                valid_sub_agents.append(cfg)
+                            else:
+                                invalid_sub_agents.append(ag_id)
+                                
+                        if invalid_sub_agents:
+                            observation = f"ERREUR : Les agents suivants sont DÉSACTIVÉS ou inexistants : {', '.join(invalid_sub_agents)}. Révise ta stratégie (Action annulée)."
+                            self._append_to_history(current_agent_id, {"role": "user", "content": observation})
+                            self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] 🛑 {observation}\n")
+                            continue
+                            
+                        sub_agents = valid_sub_agents
                             
                         self.status_update.emit(f"[{datetime.now().strftime('%H:%M:%S')}] 🐝 Lancement de l'Essaim : {len(sub_agents)} agents parallèles...\n")
                         

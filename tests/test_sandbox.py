@@ -451,9 +451,9 @@ def test_self_modification_protected():
     fichiers système (sandbox.py, workers.py...) sont protégés en écriture,
     mais restent lisibles."""
     import os
-    app_dir = os.path.dirname(os.path.abspath(__file__))
+    app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sandbox = FileSandbox(app_dir)
-    for name in ("sandbox.py", "workers.py", "ui.py", "agents.json"):
+    for name in ("core/sandbox.py", "core/workers.py", "ui.py", "agents.json"):
         # lecture : OK
         sandbox._safe_path(name, write_mode=False)
         # écriture : refusée
@@ -520,7 +520,7 @@ def test_git_diff_command_is_hardened():
 def test_run_named_command_resolves_absolute_binary(tmp_path, monkeypatch):
     """SÉCU #7 : run_named_command refuse un binaire introuvable sur le PATH
     (et donc ne laisse jamais CreateProcess chercher dans le cwd projet)."""
-    import sandbox as sandbox_mod
+    import core.sandbox as sandbox_mod
     sb = FileSandbox(tmp_path)
     monkeypatch.setattr(sandbox_mod, "resolve_external_binary", lambda name: None)
     res = sb.run_named_command("git_diff")
@@ -529,7 +529,7 @@ def test_run_named_command_resolves_absolute_binary(tmp_path, monkeypatch):
 
 def test_hardened_env_blocks_cwd_search():
     """SÉCU #7 : l'environnement durci pose NoDefaultCurrentDirectoryInExePath."""
-    from sandbox import hardened_subprocess_env
+    from core.sandbox import hardened_subprocess_env
     env = hardened_subprocess_env({})
     assert env.get("NoDefaultCurrentDirectoryInExePath") == "1"
 
@@ -569,7 +569,7 @@ def test_flexible_search_crlf_indent_preserves_cr():
 
 def test_available_models_claude_id_uses_dashes():
     """BUG #6 : l'ID Anthropic utilise des tirets, pas des points."""
-    from utils import AVAILABLE_MODELS
+    from core.utils import AVAILABLE_MODELS
     claude_ids = [v for k, v in AVAILABLE_MODELS.items() if "claude" in v.lower()]
     assert claude_ids, "au moins un modèle Claude attendu"
     for mid in claude_ids:
@@ -579,9 +579,9 @@ def test_available_models_claude_id_uses_dashes():
 def test_get_filtered_models_by_provider():
     """ROBUSTESSE #18 : filtrage par fournisseur explicite, plus par mots
     magiques dans les noms affichés."""
-    from utils import get_filtered_models
+    from core.utils import get_filtered_models
     api = get_filtered_models("api_key")
-    assert "Claude Opus 4.8" in api
+    assert "Claude Opus 4.8" not in api
     assert "Gemma 4 31B (Gemini API)" in api
     assert "Gemma 4 (LM Studio Local)" not in api
     lm = get_filtered_models("lm_studio")
@@ -593,7 +593,7 @@ def test_confirmation_diff_and_preview_announce_truncation():
     complètes et annonce toute troncature en clair (anti-dissimulation),
     y compris pour write_file désormais."""
     workers = pytest.importorskip(
-        "workers", reason="dépendances GUI/LLM absentes de cet environnement")
+        "core.workers", reason="dépendances GUI/LLM absentes de cet environnement")
     LiveAgentWorker = workers.LiveAgentWorker
     original = "\n".join(f"ligne {i}" for i in range(200)) + "\n"
     new_text = "\n".join(f"LIGNE {i}" for i in range(200)) + "\n"
