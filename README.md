@@ -28,6 +28,59 @@
     - Panneaux distincts pour les différents agents (Codeur, Général, Hardware, Meca).
     - Icônes et vues unifiées pour le Mode Essaim (Swarm).
 
+## 📂 Arborescence du Projet
+
+L'architecture du projet est organisée de la manière suivante :
+
+```text
+L'atelier IA/
+├── main.py : Point d'entrée principal de l'application lançant l'interface utilisateur.
+├── ui.py : Interface utilisateur principale de l'IDE orchestrant les différentes vues.
+├── ui_coder.py : Module de l'interface spécifique à l'onglet de l'agent codeur.
+├── ui_general.py : Module de l'interface pour le chat avec l'assistant général.
+├── ui_hardware.py : Module de l'interface dédié à l'agent de conception électronique (Hardware).
+├── ui_meca.py : Module de l'interface gérant l'agent de conception mécanique 3D (Meca).
+├── requirements.txt : Liste des dépendances et bibliothèques Python nécessaires au projet.
+├── README.md : Documentation principale de présentation du projet (ce fichier).
+├── MANUEL.md : Manuel d'utilisation détaillé des différentes fonctionnalités de l'outil.
+├── CHANGELOG.md : Historique des modifications, mises à jour et correctifs du projet.
+├── core/ : Moteur principal de l'application (LLM, orchestration, outils).
+│   ├── llm.py : Gestion des connexions et interactions avec les modèles de langage (API et local).
+│   ├── nodal_graph.py : Gestionnaire du graphe nodal pour l'exécution d'agents en mode Graphify.
+│   ├── nodal_graph_original.py : Version originale de sauvegarde du système de graphe nodal.
+│   ├── rag_engine.py : Moteur de RAG (Retrieval-Augmented Generation) pour la recherche documentaire.
+│   ├── sandbox.py : Environnement sécurisé contrôlant les opérations de lecture/écriture sur les fichiers.
+│   ├── utils.py : Fonctions utilitaires transverses utilisées à travers l'application.
+│   └── workers.py : Définition des tâches asynchrones pour éviter de bloquer l'interface graphique.
+├── coder/ : Configuration des agents logiciels.
+│   └── agents.json : Définition des rôles, outils et prompts de l'équipe de développement.
+├── general/ : Configuration de l'assistant général.
+│   └── agents.json : Paramètres et prompt de l'assistant IA généraliste.
+├── hardware/ : Outils et agents pour la conception électronique.
+│   ├── agents_hardware.json : Configuration des agents spécialisés dans le design hardware.
+│   ├── agents_skidl.json : Configuration de l'agent dédié à la génération de schémas avec SKiDL.
+│   └── convertisseur PDF-Json.py : Script utilitaire pour extraire les données de datasheets PDF.
+├── meca/ : Outils et agents pour la conception mécanique 3D.
+│   ├── agents_meca.json : Configuration des agents en charge de la modélisation CAO.
+│   └── cadquery_commands.json : Base de données des commandes CadQuery pour l'agent mécanicien.
+├── skills/ : Base de compétences métier (déclenchables avec / dans le chat).
+│   ├── audit_secu.md : Instructions de l'expert pour l'audit de sécurité du code.
+│   ├── materials_selection.md : Compétence pour l'aide au choix des matériaux en mécanique.
+│   ├── refactor.md : Instructions pour le refactoring et l'optimisation du code.
+│   ├── review.md : Skill générique pour la revue de code logiciel.
+│   ├── review_hw.md : Skill pour la vérification technique des conceptions électroniques.
+│   ├── review_meca.md : Skill pour l'analyse des modèles CAO et contraintes physiques.
+│   ├── review_ui.md : Compétence dédiée à l'évaluation des interfaces utilisateur.
+│   └── test.md : Instructions pour la conception et validation de tests unitaires.
+└── tests/ : Suite de tests unitaires du projet.
+    ├── test_llm.py : Tests validant la communication avec les modèles de langage.
+    ├── test_nodal_graph.py : Tests vérifiant la bonne exécution des graphes nodaux.
+    ├── test_rag_engine.py : Tests pour le moteur de recherche et d'indexation documentaire.
+    ├── test_sandbox.py : Tests assurant la robustesse et la sécurité de la sandbox.
+    ├── test_utils.py : Tests des fonctions utilitaires diverses.
+    └── test_workers.py : Tests des processus parallèles et tâches d'arrière-plan.
+```
+
 ## 🛠️ Installation
 
 ### Prérequis
