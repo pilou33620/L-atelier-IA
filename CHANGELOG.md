@@ -1,6 +1,12 @@
 # Changelog
 
-Dernière mise à jour : 2026-08-03 11:37:49
+Dernière mise à jour : 2026-08-04 08:25:00
+
+## Correctifs d'Infrastructure Agentique (2026-08-04)
+
+* **Correction Bug `os`** : Suppression des imports locaux (`import os`) dans `core/workers.py` (lignes 294, 1191, 2651) qui provoquaient une erreur `UnboundLocalError` et faisaient planter les outils d'édition de fichiers en boucle.
+* **Fail-Safe Anti-Boucle (Outils)** : Ajout d'un compteur `tool_failures` dans la boucle principale (`AgentWorker.run`). L'agent abandonne désormais son tour après 2 échecs consécutifs d'outils, empêchant la surconsommation de tokens.
+* **Prévention Anti-Spam** : Ajout d'une consigne stricte dans le `system_prompt` interdisant aux agents de recracher l'intégralité d'un code source dans leur réponse JSON en cas de frustration.
 
 ## Version 4.4.1
 

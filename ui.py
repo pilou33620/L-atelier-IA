@@ -670,6 +670,207 @@ class CheckableFileSystemModel(QFileSystemModel):
         self.unchecked_paths.clear()
         self.layoutChanged.emit()
 
+from core.nodal_graph import NodeItem, EdgeItem, NodeGraphWidget
+from PyQt6.QtGui import QColor, QBrush, QPen, QPainter, QFont
+from PyQt6.QtCore import Qt, QRectF, QPointF
+
+class GraphifyThemeNodeItem(NodeItem):
+    def paint(self, painter, option, widget):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        glow_color = QColor(46, 204, 113, int(40 + 60 * self._glow_intensity))
+        border_color = QColor(46, 204, 113)
+        circle_radius = 18
+        circle_center = QPointF(0, -self.height/2 + 30)
+        
+        painter.setBrush(QBrush(glow_color))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(circle_center, circle_radius + 12, circle_radius + 12)
+            
+        base_color = QColor(10, 17, 14) 
+        painter.setBrush(QBrush(base_color))
+        pen = QPen(border_color)
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.drawEllipse(circle_center, circle_radius, circle_radius)
+        
+        painter.setPen(QPen(QColor(230, 240, 235)))
+        font_header = QFont("Consolas", 10, QFont.Weight.Bold)
+        painter.setFont(font_header)
+        rect_text = QRectF(-self.width/2, -self.height/2 + 55, self.width, 25)
+        painter.drawText(rect_text, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop, self.label)
+
+class GraphifyThemeEdgeItem(EdgeItem):
+    def paint(self, painter, option, widget):
+        if not self.source_node or not self.dest_node: return
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        edge_path = self._get_path()
+        is_hovered = self.isUnderMouse()
+        
+        color = QColor(46, 204, 113, 180) if is_hovered else QColor(40, 90, 60, 120)
+        pen = QPen(color)
+        pen.setWidth(3 if is_hovered else 2)
+        painter.setPen(pen)
+        painter.drawPath(edge_path)
+        
+        if hasattr(self, 'label') and self.label:
+            painter.setPen(QPen(QColor(46, 204, 113)))
+            font = QFont("Consolas", 8, QFont.Weight.Normal, italic=True)
+            painter.setFont(font)
+            fm = painter.fontMetrics()
+            tw = fm.horizontalAdvance(self.label)
+            th = fm.height()
+            p1 = self.source_node.pos()
+            p2 = self.dest_node.pos()
+            center = (p1 + p2) / 2.0
+            painter.drawText(QRectF(center.x() - tw/2, center.y() - th/2, tw, th), Qt.AlignmentFlag.AlignCenter, self.label)
+
+class GraphifyThemeNodeGraphWidget(NodeGraphWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background-color: #050a08; border: none;")
+        self.reset_graph(keep_defaults=False)
+        
+    def add_node(self, node_id, label=""):
+        if not label: label = node_id
+        if node_id not in self.nodes:
+            node = GraphifyThemeNodeItem(node_id, label, self)
+            self.nodes[node_id] = node
+            self.scene.addItem(node)
+        return self.nodes[node_id]
+
+    def add_edge(self, source_id, dest_id):
+        if source_id in self.nodes and dest_id in self.nodes:
+            edge = GraphifyThemeEdgeItem(self.nodes[source_id], self.nodes[dest_id])
+            self.edges.append(edge)
+            self.scene.addItem(edge)
+            return edge
+        return None
+
+class GraphifyManualDialog(QDialog):
+    def __init__(self, sandbox, api_key_graphify, graphify_model_name, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Graphify Manuel")
+        self.setMinimumSize(800, 700)
+        self.sandbox = sandbox
+        self.api_key_graphify = api_key_graphify
+        self.graphify_model_name = graphify_model_name
+        self._worker = None
+
+        layout = QVBoxLayout(self)
+
+        # Sélection commande
+        cmd_layout = QHBoxLayout()
+        cmd_layout.addWidget(QLabel("<b>Commande :</b>"))
+        self.cmd_combo = QComboBox()
+        self.cmd_combo.addItems(["path (Chemin)", "explain (Expliquer)", "query (Recherche libre)"])
+        self.cmd_combo.currentIndexChanged.connect(self._on_cmd_changed)
+        cmd_layout.addWidget(self.cmd_combo)
+        layout.addLayout(cmd_layout)
+
+        # Paramètres dynamiques
+        self.param_layout = QVBoxLayout()
+        self.input_a = QLineEdit()
+        self.input_b = QLineEdit()
+        self.label_a = QLabel("Nœud A :")
+        self.label_b = QLabel("Nœud B :")
+        
+        self.param_layout.addWidget(self.label_a)
+        self.param_layout.addWidget(self.input_a)
+        self.param_layout.addWidget(self.label_b)
+        self.param_layout.addWidget(self.input_b)
+        layout.addLayout(self.param_layout)
+
+        # Exécuter
+        self.exec_btn = QPushButton("🚀 Exécuter")
+        self.exec_btn.clicked.connect(self.execute_command)
+        layout.addWidget(self.exec_btn)
+
+        # Résultat
+        layout.addWidget(QLabel("<b>Résultat :</b>"))
+        
+        from PyQt6.QtWidgets import QSplitter
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        
+        self.result_text = QTextEdit()
+        self.result_text.setReadOnly(True)
+        self.result_text.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: Consolas;")
+        self.result_text.setMaximumHeight(150)
+        splitter.addWidget(self.result_text)
+        
+        self.local_graph = GraphifyThemeNodeGraphWidget()
+        splitter.addWidget(self.local_graph)
+        
+        layout.addWidget(splitter)
+        
+        self._on_cmd_changed(0)
+
+    def _on_cmd_changed(self, idx):
+        self.input_a.clear()
+        self.input_b.clear()
+        if idx == 0: # path
+            self.label_a.setText("Nœud A (ex: FastAPI) :")
+            self.label_a.show()
+            self.input_a.show()
+            self.label_b.setText("Nœud B (ex: ModelField) :")
+            self.label_b.show()
+            self.input_b.show()
+        elif idx == 1: # explain
+            self.label_a.setText("Nœud à expliquer (ex: parse_data) :")
+            self.label_a.show()
+            self.input_a.show()
+            self.label_b.hide()
+            self.input_b.hide()
+        elif idx == 2: # query
+            self.label_a.setText("Question (ex: Quels sont les endpoints liés à la base de données ?) :")
+            self.label_a.show()
+            self.input_a.show()
+            self.label_b.hide()
+            self.input_b.hide()
+
+    def execute_command(self):
+        if not self.sandbox:
+            QMessageBox.warning(self, "Erreur", "Ouvrez d'abord un dossier projet.")
+            return
+
+        cmd = self.cmd_combo.currentIndex()
+        val_a = self.input_a.text().strip()
+        val_b = self.input_b.text().strip()
+
+        if cmd == 0:
+            if not val_a or not val_b:
+                QMessageBox.warning(self, "Erreur", "Veuillez remplir les deux nœuds.")
+                return
+            self._run_worker(self.sandbox.graphify_path, val_a, val_b, self.api_key_graphify, self.graphify_model_name)
+        elif cmd == 1:
+            if not val_a:
+                QMessageBox.warning(self, "Erreur", "Veuillez entrer un nœud.")
+                return
+            self._run_worker(self.sandbox.graphify_explain, val_a, self.api_key_graphify, self.graphify_model_name)
+        elif cmd == 2:
+            if not val_a:
+                QMessageBox.warning(self, "Erreur", "Veuillez entrer une question.")
+                return
+            self._run_worker(self.sandbox.graphify_query, val_a, self.api_key_graphify, self.graphify_model_name)
+
+    def _run_worker(self, func, *args):
+        self.exec_btn.setEnabled(False)
+        self.exec_btn.setText("⏳ Exécution en cours...")
+        self.result_text.clear()
+        
+        self._worker = FunctionWorker(func, *args)
+        self._worker.finished_task.connect(self._on_finished)
+        self._worker.start()
+
+    def _on_finished(self, success, result):
+        self.exec_btn.setEnabled(True)
+        self.exec_btn.setText("🚀 Exécuter")
+        if success:
+            self.result_text.setPlainText(str(result))
+            self.local_graph.display_graphify_output(str(result))
+        else:
+            self.result_text.setPlainText(f"❌ Erreur : {result}")
+
 class MainWindow(QMainWindow):
     def __init__(self, auth_mode, app_mode="coder", is_demo=False):
         super().__init__()
@@ -1005,6 +1206,26 @@ git push -u origin main</pre>"""
         layout.addLayout(btn_layout)
         dialog.exec()
 
+    def open_manual_graphify(self):
+        if not self.sandbox:
+            QMessageBox.warning(self, "Erreur", "Ouvrez d'abord un dossier projet.")
+            return
+            
+        choice = self.settings.value("graphify_api_key_choice", 0, type=int)
+        if choice == 0:
+            g_key = self.api_file_path
+        elif choice == 1:
+            g_key = self.api_file_path_2
+        else:
+            g_key = self.api_file_path_claude
+            
+        model = self.settings.value("graphify_model_name", "Par défaut (Auto)", type=str)
+        if model == "Par défaut (Auto)":
+            model = None
+            
+        dialog = GraphifyManualDialog(self.sandbox, g_key, model, self)
+        dialog.exec()
+
     def closeEvent(self, event):
         """Gestion propre de la fermeture pour annuler les threads en cours."""
         # BUGFIX (V4.3.0) : le worker d'Analyse Graphify manquait à la liste
@@ -1312,6 +1533,13 @@ git push -u origin main</pre>"""
         self.github_btn.setToolTip("Gérer le dépôt GitHub (Création ou Mise à jour)")
         self.github_btn.clicked.connect(self.run_github_helper)
         btn_layout.addWidget(self.github_btn)
+        
+        self.manual_graphify_btn = QPushButton("🕹️ Graphify Manuel")
+        self.manual_graphify_btn.setToolTip("Ouvrir l'interface manuelle pour lancer graphify path, explain, query")
+        self.manual_graphify_btn.clicked.connect(self.open_manual_graphify)
+        if self.app_mode != "coder":
+            self.manual_graphify_btn.hide()
+        btn_layout.addWidget(self.manual_graphify_btn)
         
         v.addLayout(btn_layout)
 

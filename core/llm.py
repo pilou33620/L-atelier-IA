@@ -225,13 +225,37 @@ def _salvage_non_text_blocks(final_message):
             continue
         # Cas direct : l'outil de la passerelle a reçu notre action telle quelle.
         if "action" in payload:
-            return _json.dumps(payload, ensure_ascii=False)
+            return "```json\n" + _json.dumps(payload, indent=2, ensure_ascii=False) + "\n```"
         # Cas enveloppé : l'action est nichée dans un argument de l'outil.
         for value in payload.values():
             if isinstance(value, dict) and "action" in value:
-                return _json.dumps(value, ensure_ascii=False)
+                return "```json\n" + _json.dumps(value, indent=2, ensure_ascii=False) + "\n```"
             if isinstance(value, str) and '"action"' in value:
+                # Si c'est déjà une chaîne JSON, on l'encadre juste
+                val_stripped = value.strip()
+                if not val_stripped.startswith("```"):
+                    return "```json\n" + val_stripped + "\n```"
                 return value
+        
+        # Cas natif : l'outil est reconnu directement par la passerelle (ou le modèle)
+        # qui le formate en appel natif au lieu d'une action JSON dans le texte.
+        tool_name = getattr(block, "name", None)
+        if tool_name:
+            reconstructed = {"action": tool_name}
+            if "args" in payload:
+                # La passerelle peut avoir niché les arguments dans une chaîne JSON
+                if isinstance(payload["args"], str):
+                    try:
+                        reconstructed["args"] = _json.loads(payload["args"])
+                    except Exception:
+                        reconstructed["args"] = payload["args"]
+                else:
+                    reconstructed["args"] = payload["args"]
+            else:
+                # Sinon on assume que le payload contient directement les arguments
+                reconstructed["args"] = payload
+            return "```json\n" + _json.dumps(reconstructed, indent=2, ensure_ascii=False) + "\n```"
+            
     return ""
 
 

@@ -291,7 +291,6 @@ class LiveAgentWorker(QThread):
         Retourne None si tout est OK, ou un message d'erreur si une empreinte est manquante.
         """
         import glob
-        import os
         import re
         
         py_files = glob.glob(os.path.join(directory, "*.py"))
@@ -1188,7 +1187,6 @@ class LiveAgentWorker(QThread):
                 from PyQt6.QtGui import QDesktopServices
                 from PyQt6.QtCore import QUrl
                 from pathlib import Path
-                import os
                 
                 graphify_bin = resolve_external_binary("graphify")
                 if not graphify_bin:
@@ -1961,6 +1959,9 @@ class LiveAgentWorker(QThread):
                                   "(run_tests, graphify_*) déclenche une fenêtre de validation "
                                   "côté utilisateur. Si une explication est nécessaire, mets-la dans le champ "
                                   "approprié de ton unique action JSON (ex: le 'context' d'un delegate).")
+                system_prompt += ("\n\nRÈGLE ANTI-SPAM : Ne génère JAMAIS le code complet d'un fichier dans ta réponse. "
+                                  "Utilise les outils pour appliquer des modifications précises. "
+                                  "Si un outil échoue en boucle, tu dois t'arrêter et demander de l'aide à l'utilisateur.")
                 system_prompt += ("\n\nRÈGLE CRITIQUE DE FORMAT : Ton message DOIT contenir l'action à exécuter au format JSON STRICT. "
                                   "Tu NE DOIS PAS écrire de texte libre en dehors de l'objet JSON. "
                                   "Si tu dois réfléchir, ajoute une clé 'thought' DANS ton objet JSON. "
@@ -1990,6 +1991,7 @@ class LiveAgentWorker(QThread):
                 # V4.4.2 : relances consécutives sur réponse inexploitable.
                 # Remis à zéro dès qu'une action valide est extraite.
                 parse_failures = 0
+                tool_failures = 0
                 
                 while not agent_finished:
                     if getattr(self, '_is_cancelled', False):
@@ -2476,6 +2478,20 @@ class LiveAgentWorker(QThread):
                         prev_changed = len(self.changed_files)
                         observation = self.execute_tool(action, current_agent_id)
                         
+                        # Fail-safe anti-boucle infinie d'outils
+                        if isinstance(observation, str) and (observation.startswith("ERREUR") or observation.startswith("ÉCHEC")):
+                            tool_failures += 1
+                            if tool_failures >= 2:
+                                if self._abandon_agent_turn(
+                                        current_agent_id, name, tool_failures, f"Échec répété de l'outil {act_name}"):
+                                    return
+                                mission_context = self._last_abandon_reason
+                                current_agent_id = "orchestrator"
+                                agent_finished = True
+                                continue
+                        else:
+                            tool_failures = 0
+                        
                         # Progression détectée (fichier modifié) : on remet à
                         # zéro la patience PAR AGENT, mais le plafond global
                         # (total_delegations) continue de courir.
@@ -2648,7 +2664,6 @@ class GraphifyAnalysisWorker(QThread):
         # puis l'écrit sur disque. Un seul LLM rédige (fin de la redondance
         # Gemini-via-graphify + Gemma), et la clé API ne quitte plus l'appli.
         try:
-            import os
             import json
 
             if not os.path.exists(self.graph_path):

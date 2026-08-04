@@ -139,6 +139,11 @@ class EdgeItem(QGraphicsObject):
         self.setZValue(1)
         self.setAcceptHoverEvents(True)
         self.messages = []
+        self.label = ""
+
+    def set_label(self, label):
+        self.label = label
+        self.update()
 
     def add_message(self, message):
         self.messages.append(message)
@@ -146,7 +151,7 @@ class EdgeItem(QGraphicsObject):
     def boundingRect(self):
         if not self.source_node or not self.dest_node:
             return QRectF()
-        extra = 15
+        extra = 40
         p1 = self.source_node.pos()
         p2 = self.dest_node.pos()
         rect = QRectF(p1, p2).normalized()
@@ -184,6 +189,28 @@ class EdgeItem(QGraphicsObject):
         pen.setWidth(4 if is_hovered else 2)
         painter.setPen(pen)
         painter.drawPath(edge_path)
+        
+        if hasattr(self, 'label') and self.label:
+            painter.setPen(QPen(QColor(220, 220, 220)))
+            font = QFont("Segoe UI", 8)
+            painter.setFont(font)
+            fm = painter.fontMetrics()
+            tw = fm.horizontalAdvance(self.label)
+            th = fm.height()
+            
+            p1 = self.source_node.pos()
+            p2 = self.dest_node.pos()
+            center = (p1 + p2) / 2.0
+            
+            # Draw a dark background for the text
+            bg_rect = QRectF(center.x() - tw/2 - 4, center.y() - th/2 - 2, tw + 8, th + 4)
+            painter.setBrush(QBrush(QColor(30, 30, 30, 220)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(bg_rect, 3, 3)
+            
+            # Draw the text
+            painter.setPen(QPen(QColor(200, 200, 220)))
+            painter.drawText(bg_rect, Qt.AlignmentFlag.AlignCenter, self.label)
 
     def hoverEnterEvent(self, event):
         self.hover_entered.emit(self, event)
@@ -765,22 +792,70 @@ class NodeGraphWidget(QGraphicsView):
         anim.start()
         packet._anim = anim
         
-    def reset_graph(self):
+    def reset_graph(self, keep_defaults=True):
         self.scene.clear()
         self.nodes.clear()
         self.edges.clear()
         
-        try:
-            from core.utils import AGENTS_CONFIG
-            # N'ajouter que l'orchestrateur au démarrage. Les autres s'ajouteront dynamiquement s'ils sont utilisés.
-            if "orchestrator" in AGENTS_CONFIG:
-                self.add_node("orchestrator", AGENTS_CONFIG["orchestrator"].get("name", "Orchestrateur"))
-            elif "assistant_general" in AGENTS_CONFIG:
-                self.add_node("assistant_general", AGENTS_CONFIG["assistant_general"].get("name", "Assistant Général"))
-            else:
+        if keep_defaults:
+            try:
+                from core.utils import AGENTS_CONFIG
+                # N'ajouter que l'orchestrateur au démarrage. Les autres s'ajouteront dynamiquement s'ils sont utilisés.
+                if "orchestrator" in AGENTS_CONFIG:
+                    self.add_node("orchestrator", AGENTS_CONFIG["orchestrator"].get("name", "Orchestrateur"))
+                elif "assistant_general" in AGENTS_CONFIG:
+                    self.add_node("assistant_general", AGENTS_CONFIG["assistant_general"].get("name", "Assistant Général"))
+                else:
+                    self.add_node("orchestrator", "Orchestrateur")
+            except Exception:
                 self.add_node("orchestrator", "Orchestrateur")
-        except Exception:
-            self.add_node("orchestrator", "Orchestrateur")
+
+    def display_graphify_output(self, text):
+        self.reset_graph(keep_defaults=False)
+        
+        import re
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        clean_text = ansi_escape.sub('', text)
+        
+        lines = clean_text.strip().split('\n')
+        current_node = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("Shortest path") or line.startswith("Aucun chemin") or line.startswith("Erreur"):
+                continue
+                
+            tokens = re.split(r'(<-+.*?--|-+.*?-+>)', line)
+            
+            for i in range(len(tokens)):
+                token = tokens[i].strip()
+                if not token:
+                    continue
+                    
+                if token.startswith('<--') or token.startswith('--'):
+                    if i + 1 < len(tokens) and tokens[i+1].strip():
+                        next_node = tokens[i+1].strip()
+                        self.add_node(next_node, next_node)
+                        
+                        label = token.strip('<-> ')
+                        
+                        if token.startswith('<--'):
+                            if current_node:
+                                edge = self.add_edge(next_node, current_node)
+                                if edge: edge.set_label(label)
+                        else:
+                            if current_node:
+                                edge = self.add_edge(current_node, next_node)
+                                if edge: edge.set_label(label)
+                                
+                        current_node = next_node
+                        tokens[i+1] = ""
+                else:
+                    current_node = token
+                    self.add_node(current_node, current_node)
+                
+        self._recalc_layout()
+
     def wheelEvent(self, event):
         zoom_in_factor = 1.15
         zoom_out_factor = 1 / zoom_in_factor
